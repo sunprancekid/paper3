@@ -35,7 +35,7 @@ save
 !** GLOBAL CONSTANTS
 !*************************************************************
 
-! ** constants ***********************************************
+! ** DMD constants *******************************************
 integer, parameter :: dbl = selected_real_kind (32) ! integer which determines precision of real numbers
 real(kind=dbl), parameter :: pi = 3.141592653589793238
 real(kind=dbl), parameter :: twopi = 2. * pi
@@ -50,65 +50,15 @@ character(len=12), parameter :: green = ' 0 0 1'
 character(len=12), parameter :: orange = ' 1 0 0.64'
 character(len=12), parameter :: purple = ' 1 1 0'
 character(len=15), parameter :: white = ' 0.75 0.75 0.75'
-
-
 ! ** ensemble ************************************************
 integer, parameter :: ndim = 2 ! number of dimensions 
-integer, parameter :: cell = 16 ! number of lattice cells
 integer, parameter :: mer = 4 ! number of hardspheres which make one cube
-real(kind=dbl), parameter :: xa = 1.0 ! mol fraction of A chirality [NOTE: value must be between 0 and 1]
-real(kind=dbl), parameter :: eta = 0.05 ! packing fraction: ration of total sphere area to total area [RW MAX: ~ 0.4..]
-real(kind=dbl), parameter :: tempstart = 1.5 ! starting temperature of the simulation 
-real(kind=dbl), parameter :: tempfinal = 0.0025 ! final system temperature set point 
-real(kind=dbl), parameter :: sigma1 = 1.0 ! distance from sphere center to first discontinuity (diameter of hardsphere)
-real(kind=dbl), parameter :: sigma2 = 1.15 * sigma1 ! distance from sphere center to second discontinuity
-real(kind=dbl), parameter :: sigma3 = 1.4 * sigma1 ! distance from sphere center to third discontinuity
-real(kind=dbl), parameter :: epsilon1 = 1.0000 ! reduced energy parameter
-real(kind=dbl), parameter :: epsilon2 = 0.8259 * epsilon1 ! depth of innermost well
-real(kind=dbl), parameter :: epsilon3 = 0.3146 * epsilon1 ! depth of outermost well
-real(kind=dbl), parameter :: delta = 0.015 ! half the bond length
-real(kind=dbl), parameter :: exittemp = 0.01 ! final system temperature 
-!*************************************************************
-integer, parameter :: cube = cell ** 2 ! number of cubes
-integer, parameter :: mols = cube*mer ! number of hardspheres
-integer, parameter :: na = cube * xa ! number of a chirality cubes 
 real(kind=dbl), parameter :: excluded_area = 1. + ((3. / 4.) * pi) ! area occupied by one 2x2 square
-real(kind=dbl), parameter :: area = (excluded_area * cube) / eta ! area of simulation box
-real(kind=dbl), parameter :: region = sqrt (area) ! length of simulation box wall
-real(kind=dbl), parameter :: density = real(cube) / area ! number density of cubes
-real(kind=dbl), parameter :: sg1sq = sigma1 ** 2
-real(kind=dbl), parameter :: sg2sq = sigma2 ** 2
-real(kind=dbl), parameter :: sg3sq = sigma3 ** 2
-real(kind=dbl), parameter :: inbond = sigma1 - delta ! inner bond distance
-real(kind=dbl), parameter :: onbond = sigma1 + delta ! outer bond distance
-real(kind=dbl), parameter :: icbond = sqrt(2 * sigma1) - delta ! inner cross bond distance
-real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bond distance
-! ** anderson thermostat *************************************
-logical, parameter :: thermostat = .true. ! anderson thermostat status: .false. == off, .true. == on
-real(kind=dbl), parameter :: thermal_conductivity = 200.0 ! the thermal conductivity of the hardsphere system [THIS VALUE HAS NOT BEEN VERIFIED!!]
-
-
-! ** settings ************************************************
-real(kind=dbl), parameter :: frac = 0.95 ! fractional amount by which to reduce the temperarture of the annealing simulation
-integer, parameter :: total_events = 200000000 ! total number of events in the simulation at the temperature set point
-integer, parameter :: event_equilibrium = 0.1 * total_events ! number of steps during which the system is considered at equilibrium, equilibrium property values are taken
-integer, parameter :: event_equilibriate = 0.9 * total_events ! number of steps during which the system is allowed to equilibriate
-integer, parameter :: event_reschedule = 10000 ! number of steps by which to reschedule entire event calander, adjust temperatures
-integer, parameter :: event_average = 1000000 ! number of steps between property calculations and complete rescheduling
-integer, parameter :: propfreq = 1000000 ! frequency of property calculations, when the system is not at equilibrium
-integer, parameter :: milestonecheck_freq = 1000 ! frequency with which to check properties related to markovian milestoning
 real(kind=dbl), parameter :: tol = 0.001 ! amount by which to allow mistakes from numberical integration (i.e. overlap and bcs)
 integer, parameter :: debug = 0 ! debugging status: 0 == off, 1 == on, 2 == extra on 
-
-
-! ** order parameters ****************************************
-integer, parameter :: orderlength = 15
-real(kind=dbl), parameter :: orderwidth = sigma3
-
-
 ! ** file management *****************************************
-character(len=15), parameter :: simtitle = 'polsquare'
-character(len=20), parameter :: simid = '2Aa10e05'
+character(len=15), parameter :: simtitle = 'polsqu2x2'
+character(len=20), parameter :: simid = 'test'
 character(len=45), parameter :: fpossavefile = trim(simtitle) // trim(simid) // '__fposSAVE.dat' ! save file containing all false position vectors 
 character(len=45), parameter :: velsavefile = trim(simtitle) // trim(simid) // '__velSAVE.dat' ! save file containing all velocity vectors 
 character(len=45), parameter :: chaisavefile = trim(simtitle) // trim(simid) // '__chaiSAVE.dat' ! save file containing chiraliry description of each grouping
@@ -129,15 +79,131 @@ integer :: moviesqu = 1 ! movie making status of simulation as squares: 0 == off
 real(kind=dbl) :: movfreq = 200.0 ! frequency to take snapshots of movies [reduced seconds]
 
 
-! ** cell + neighbor list ***************************
-integer, parameter :: nbrListSize = 8 ! average number of neighbors per particle 
-integer, parameter :: nbrListSizeMax = 100 ! maximum number of particles accessible to list 
-real(kind=dbl), parameter :: nbrRadiusMinInt = 3.0 ! integer used for determing the max displacement required for a neighborlist update
-real(kind=dbl), parameter :: nbrRadiusMin = (nbrRadiusMinInt / (nbrRadiusMinInt - 1)) * (sigma3 - (sigma1 / nbrRadiusMinInt)) ! minimum required radius
-real(kind=dbl), parameter :: nbrRadius = max(sqrt((real(nbrListSize) / (real(mer) * density)) * (1.0 / pi)), nbrRadiusMin) ! radius of neighborlist
-real(kind=dbl), parameter :: nbrDispMax = (nbrRadius - sigma1) / nbrRadiusMinInt ! max particle displacement before a neighborlist update is required
-integer, parameter :: nCells = floor (region / nbrRadius) ! number of cells in one dimension, cell length cannot be shorter than the nerighbor radius
-real(kind=dbl), parameter :: lengthCell = region / real (nCells) ! legnth of each cell in one dimension, must be greater than the square well length (sig2)
+
+! ** SIMULATION SETTINGS *************************************
+! boolean and default constants for values used to initia-
+! lize the simulation
+
+! ** PARAMETERS **
+! DENSITY
+! density as area fraction
+real(kind=dbl), parameter :: default_areafraction = 0.6
+real(kind=dbl), parameter :: max_areafraction = 0.83
+real(kind=dbl), parameter :: min_areafraction = 0.01
+real(kind=dbl) :: eta = default_areafraction
+logical :: use_default_areafraction = .true.
+
+! NUMBER OF PARTICLES
+! number of lattice cells in each dimension for square 
+! simulation box
+integer, parameter :: default_cell = 8
+!integer, parameter :: max_cell = 100
+integer, parameter :: min_cell = 2
+integer :: cell = default_cell ! number of lattice cells
+logical :: use_default_cell = .true.
+
+! NUMBER OF PARTICLES
+! mol fraction of A-chirality squares in system
+real(kind=dbl), parameter :: default_achairality = 1.0
+real(kind=dbl), parameter :: max_achairality = 1.0
+real(kind=dbl), parameter :: min_achirality = 0.0
+real(kind=dbl) :: xa = default_achairality
+logical :: use_default_achairality = .true.
+
+! TEMPERATURE
+! assigned system temperature, used to initialize the velocity
+! of simulation particles
+real(kind=dbl), parameter :: default_temperature = 1.5
+real(kind=dbl), parameter :: max_temperature = 10.
+real(kind=dbl), parameter :: min_temperature = 0.001
+real(kind=dbl) :: temperature = default_temperature
+logical :: use_default_temperature = .true.
+
+! SIMULATION LENGTH
+! length of simulation defined as the number of collision events
+integer, parameter :: default_events = 1e8 ! default number of events
+integer, parameter :: min_events = 0
+integer :: total_events = default_events
+logical :: use_default_events = .true.
+
+! ANNEALING 
+real(kind=dbl), parameter :: default_frac = 0.95 
+! fractional amount by which to reduce the temperarture 
+! of the annealing simulation
+real(kind=dbl) :: anneal_frac = default_frac 
+logical :: use_default_frac = .true.
+
+! EQUILIBRIUM 
+! simulation length until equilibrium has been established
+
+
+! ** DEPENDENCIES **
+integer :: cube ! number of cubes in the system
+integer :: mols ! number of hard spheres 
+integer :: na, nb ! number of a-chirality, b-chirality squares
+real(kind=dbl) :: region ! length of simulation box in each dimension
+real(kind=dbl) :: area ! area of simulation box 
+real(kind=dbl) :: density ! number density of particles
+integer :: event_equilibrium ! length of simulation after equilibriation
+integer :: event_equilibriate ! length of simulation before equilibriation
+integer :: event_reschedule ! events between complete event rescheduling
+integer :: event_average ! events between property averaging
+integer :: propfreq ! frequency of property calculations
+integer :: milestonecheck_freq ! frequency to check milestoning properties
+
+
+
+! ** SQUARE SETTINGS *****************************************
+! ** defines physics used to model dynamics of square particles
+real(kind=dbl), parameter :: tempfinal = 0.0025 ! final system temperature set point 
+real(kind=dbl), parameter :: sigma1 = 1.0 ! distance from sphere center to first discontinuity (diameter of hardsphere)
+real(kind=dbl), parameter :: sigma2 = 1.15 * sigma1 ! distance from sphere center to second discontinuity
+real(kind=dbl), parameter :: sigma3 = 1.4 * sigma1 ! distance from sphere center to third discontinuity
+real(kind=dbl), parameter :: epsilon1 = 1.0000 ! reduced energy parameter
+real(kind=dbl), parameter :: epsilon2 = 0.8259 * epsilon1 ! depth of innermost well
+real(kind=dbl), parameter :: epsilon3 = 0.3146 * epsilon1 ! depth of outermost well
+real(kind=dbl), parameter :: delta = 0.015 ! half the bond length
+real(kind=dbl), parameter :: exittemp = 0.01 ! final system temperature 
+!*************************************************************
+real(kind=dbl), parameter :: sg1sq = sigma1 ** 2
+real(kind=dbl), parameter :: sg2sq = sigma2 ** 2
+real(kind=dbl), parameter :: sg3sq = sigma3 ** 2
+real(kind=dbl), parameter :: inbond = sigma1 - delta ! inner bond distance
+real(kind=dbl), parameter :: onbond = sigma1 + delta ! outer bond distance
+real(kind=dbl), parameter :: icbond = sqrt(2 * sigma1) - delta ! inner cross bond distance
+real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bond distance
+! ** anderson thermostat *************************************
+logical, parameter :: thermostat = .true. ! anderson thermostat status: .false. == off, .true. == on
+real(kind=dbl), parameter :: thermal_conductivity = 200.0 ! the thermal conductivity of the hardsphere system [THIS VALUE HAS NOT BEEN VERIFIED!!]
+
+! ** order parameters ****************************************
+integer, parameter :: orderlength = 15
+real(kind=dbl), parameter :: orderwidth = sigma3
+
+
+! ** EFFICIENCY TECHNIQUES ***********************************
+! ** cell + neighbor list
+
+! PARAMETERS
+! maximum number of particles accessible to list 
+integer, parameter :: nbrListSizeMax = 100 
+
+! calculated / target average number of neighbors in list
+integer, parameter :: default_nbrListSize = 8
+integer :: nbrListSize
+logical :: use_default_nbrListSize = .true.
+
+! integer used for determing the max displacement required for a neighborlist update
+real(kind=dbl), parameter :: default_nbrRadiusMinInt = 3.0 
+real(kind=dbl) :: nbrRadiusMinInt = default_nbrRadiusMinInt 
+logical :: use_default_nbrRadiusMinInt = .true.
+
+! DEPENDENCIES
+real(kind=dbl) :: nbrRadiusMin ! minimum required radius
+real(kind=dbl) :: nbrRadius ! radius of neighborlist
+real(kind=dbl) :: nbrDispMax ! max particle displacement before a neighborlist update is required
+integer :: nCells ! number of cells in one dimension, cell length cannot be shorter than the nerighbor radius
+real(kind=dbl) :: lengthCell ! legnth of each cell in one dimension, must be greater than the square well length (sig2)
 
 
 
@@ -201,8 +267,10 @@ end type node
 !** GLOBAL VARIABLES
 !*************************************************************
 
+! simulation settings
+
 ! ** simulation molecules ************************************ 
-type(group), dimension(cube) :: square ! square groupings plus ghost event
+type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
 type(event) :: ghost_event ! ghost collision event 
 ! ** simulation parameters ***********************************
 real(kind=dbl) :: timenow ! current length of simulation 
@@ -237,7 +305,7 @@ type(property) :: nematic ! nematic order parameter between all squares
 ! ** efficiency methods **************************************
 real(kind=dbl) :: dispTotal ! displacement of fastest particle between neighborlist updates
 logical :: nbrnow ! update neighbor list?
-type(node), dimension(mols+1) :: eventTree ! binary tree list used for scheduling collision events
+type(node), dimension(:), allocatable :: eventTree ! binary tree list used for scheduling collision events
 integer :: rootnode ! pointer to first node of binary tree using for scheduling collision events
 real(kind=dbl) :: tsl, tl ! used for false positioning method: time since last update and time of last update
 ! ** markovian milestoning ***********************************
@@ -350,6 +418,204 @@ function single_step () result (stop)
     end if 
 end function single_step
 
+! SIMULATION SETTINGS FUNCTIONS
+
+subroutine initialize_simulation_settings (af, ac, t, e, nc)
+    implicit none 
+    real, intent(in), optional :: af ! area fraction
+    real, intent(in), optional :: ac ! a-chirality
+    real, intent(in), optional :: t ! temperature 
+    integer, intent(in), optional :: e ! events 
+    integer, intent(in), optional :: nc ! number of cells
+
+    ! load any arguments that were passed to the method
+    if (present(nc)) then 
+        if (set_cells(nc)) then 
+            use_default_cell = .false.
+        endif
+    endif
+    write (*,"('initialize_settings :: lattice cells set to ', I3)") cell
+
+    if (present(af)) then 
+        if (set_areafraction(af)) then 
+            use_default_areafraction = .false.
+        endif
+    endif
+    write (*,"('initialize_settings :: area fraction set to ', F5.3)") eta
+
+    if (present(ac)) then 
+        if (set_achirality(ac)) then 
+            use_default_achairality = .false.
+        endif
+        write (*,*) "initialize_settings :: a-chirality fraction of squares was specified."
+    endif 
+    write (*,"('initialize_settings :: a-chirality fraction set to ', F5.3)") xa
+
+    if (present(t)) then 
+        if (set_temperature(t)) then 
+            use_default_temperature = .false.
+        endif
+    endif
+    write (*,"('initialize_settings :: simulation temperature set to ', F5.3)") temperature
+
+    if (present(e)) then 
+        if (set_events(e)) then 
+            use_default_events = .false.
+        endif 
+    endif
+    write (*,"('initialize_settings :: simulation events set to ', F5.1, ' million')") (real(total_events) / 1e6)
+
+    ! once settings have been loaded, initialize the relevant parameters
+    ! parameters for initializing system
+    cube = cell ** 2 ! number of cubes
+    mols = cube*mer ! number of hardspheres
+    na = cube * xa ! number of a chirality cubes 
+    area = (excluded_area * cube) / eta ! area of simulation box
+    region = sqrt (area) ! length of simulation box wall
+    density = real(cube) / area ! number density of cubes
+
+    ! parameters for running simulation
+    event_equilibrium = 0.1 * total_events
+    event_equilibriate = 0.9 * total_events 
+    event_reschedule = 10000 
+    event_average = 1000000
+    propfreq = 1000000 
+    milestonecheck_freq = 1000 
+
+    ! turn on cell + neighbor list
+    call initialize_cell_neighbor_list()
+end subroutine initialize_simulation_settings
+
+subroutine initialize_cell_neighbor_list() 
+    implicit none 
+
+    nbrRadiusMin = (nbrRadiusMinInt / (nbrRadiusMinInt - 1)) * (sigma3 - (sigma1 / nbrRadiusMinInt)) ! minimum required radius
+    nbrRadius = max(sqrt((real(nbrListSize) / (real(mer) * density)) * (1.0 / pi)), nbrRadiusMin) ! radius of neighborlist
+    nbrDispMax = (nbrRadius - sigma1) / nbrRadiusMinInt ! max particle displacement before a neighborlist update is required
+    nCells = floor (region / nbrRadius) ! number of cells in one dimension, cell length cannot be shorter than the nerighbor radius
+    lengthCell = region / real (nCells) ! legnth of each cell in one dimension, must be greater than the square well length (sig2)
+end subroutine initialize_cell_neighbor_list
+
+function set_areafraction(val) result (success)
+    implicit none
+    logical :: success ! used to determine if operation was successful
+    real(kind=dbl), parameter :: t = tol 
+    ! tolerance used for comparing real values
+    real(kind=dbl), parameter :: max_val = max_areafraction
+    ! maximum allowable value value that user can assign
+    real(kind=dbl), parameter :: min_val = min_areafraction
+    ! minimum allowable value that user can assign
+    real(kind=dbl), parameter :: default_val = default_areafraction
+    ! default value assigned by module
+    real, intent(in) :: val ! area fraction passed by user
+
+    ! check that value passed to method is within the range
+    if ((val > (max_val + t)) .or. (val < (min_val - t))) then 
+        ! if the value passed to the method is above the allowable limit
+        ! inform the used and keep the default value
+        150 format(" SET AREA FRACTION :: Value passed to method (", F5.3, ") is outside of range", &
+            " (MIN = ", F5.3,", MAX = ", F5.3,"). Area fraction set to default value of ", F5.3, ".")
+        write (*,150) val, min_val, max_val, default_val
+        success = .false.
+    endif
+    eta = val
+    success = .true.
+end function set_areafraction
+
+function set_cells(val) result (success)
+    implicit none 
+    logical :: success ! used to determine if operation was successful
+    integer, parameter :: min_val = min_cell
+    ! minimum allowable value that user can assign
+    integer, parameter :: default_val = default_cell
+    ! default value assigned by module
+    integer, intent(in) :: val ! number of lattice cells assigned by user
+
+    ! check that the value assigned by the user is within the allowable range
+    if (val < min_val) then 
+        ! the value is outside the allowable range
+        ! inform the user, exit unsuccessful
+        151 format ("SET LATTICE CELL :: value passed to method (", I4, ") is outside the allowable range ", &
+            "(MIN = ", I4,"). Lattice cells set to default value (", I4,").")
+        write (*,151) val, min_val, default_val
+        success = .false.
+    endif
+    cell = val 
+    success = .true.
+end function set_cells
+
+function set_achirality (val) result (success)
+    implicit none 
+    logical :: success ! used to determine if operation was successful
+    real(kind=dbl), parameter :: t = tol 
+    ! tolerance used for comparing real values
+    real(kind=dbl), parameter :: max_val = max_achairality
+    ! maximum allowable value that user can assign
+    real(kind=dbl), parameter :: min_val = min_achirality
+    ! minimum allowable value that user can assign
+    real(kind=dbl), parameter :: default_val = default_achairality
+    ! default value assigned by module
+    real, intent(in) :: val ! a-chirality fraction assigned by user
+
+    ! check that the value passed to the method is within the range
+    if ((val > (max_val + t)) .or. (val < (min_val - t))) then 
+        ! if the value passed to the method is outside the allowable range
+        ! inform the user and keep the default value
+        152 format(" SET A-CHIRALITY FRACTION :: Value passed to method (", F5.3, ") is outside of range", &
+            " (MIN = ", F5.3,", MAX = ", F5.3,"). Area fraction set to default value of ", F5.3, ".")
+        write (*,152) val, min_val, max_val, default_val
+        success = .false.
+    endif
+    xa = val 
+    success = .true.
+end function set_achirality
+
+function set_temperature (val) result (success)
+    implicit none 
+    logical :: success ! determines if operation was successful
+    real(kind=dbl), parameter :: t = tol 
+    ! maximum allowable value that user can assign
+    real(kind=dbl), parameter :: min_val = min_temperature
+    ! minimum allowable value that user can assign
+    real(kind=dbl), parameter :: default_val = default_temperature
+    ! default value assigned by module
+    real, intent(in) :: val ! simulation temperature assigned by user
+
+    ! check that the value passed to the method is within the range
+    if (val < (min_val - t)) then 
+        ! if the value passed to the method is outside the allowable range
+        ! inform the user and keep the default value
+        152 format(" SET TEMPERATURE :: Value passed to method (", F5.3, ") is outside of range", &
+            " (MIN = ", F5.3,"). Area fraction set to default value of ", F5.3, ".")
+        write (*,152) val, min_val, default_val
+        success = .false.
+    endif
+    temperature = val 
+    success = .true.
+end function set_temperature
+
+function set_events(val) result (success)
+    implicit none 
+    logical :: success ! used to determine if operation was successful
+    integer, parameter :: min_val = min_events
+    ! minimum allowable value that user can assign
+    integer, parameter :: default_val = default_events
+    ! default value assigned by module
+    integer, intent(in) :: val ! number of lattice cells assigned by user
+
+    ! check that the value assigned by the user is within the allowable range
+    if (val < min_val) then 
+        ! the value is outside the allowable range
+        ! inform the user, exit unsuccessful
+        151 format ("SET EVENTS :: value passed to method (", F5.1, " million) is outside the allowable range ", &
+            "(MIN = ", I4,"). Lattice cells set to default value (", F5.1," million).")
+        write (*,151) (real(val) / 1e6), min_val, (real(default_val) / 1e6)
+        success = .false.
+    endif
+    total_events = val 
+    success = .true.
+end function set_events
+
 ! ** type(id) functions **************************************
 
 type(id) function nullset()
@@ -426,6 +692,11 @@ subroutine initialize_system ()
     if (tempset <= tempfinal) call exit() ! DONE: prevent the system from simulating below the maximum
     call open_files ()
 
+    ! allocate arrays
+    allocate(square(cube))
+    allocate(eventTree(mols+1))
+    call exit()
+
     ! initialize groupings
     call reset_state ()
     call set_position ()
@@ -489,7 +760,7 @@ subroutine adjust_temperature(temp)
     ! ** local variables *************************************
     
     if (temp > tempfinal) then
-        temp = temp * frac
+        temp = temp * anneal_frac
     else 
         write (simiounit, *) 'adjust_temperature: temperature for simulation', &
             ' below the allowable amount. Annealing simulation has ended.'
@@ -515,7 +786,7 @@ subroutine set_annealstatus()
         close (unit = saveiounit, status = 'KEEP')
     else ! if not save status for the anneal simulation exists, start the simulation from the beginning 
         anneal = 0
-        tempset = tempstart
+        tempset = temperature
     end if 
 end subroutine set_annealstatus
 

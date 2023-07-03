@@ -28,6 +28,14 @@ program polarizedsquare_simulation
         call get_command_argument(a,args(a))
     enddo
 
+    ! pass settings to module
+    ! load settings
+    ! TO THINK :: better to pass values to function, or set each
+    ! parameter individually
+    call initialize_simulation_settings(af = 0.4, e = 50000000)
+    ! TODO :: add method for turning movies on an off
+    ! TODO :: add methods for turning property calculation on and off
+
     ! load system
     ! system will be initialized if save files are not present
     call initialize_system()
@@ -38,6 +46,10 @@ program polarizedsquare_simulation
             if (single_step()) exit
         enddo
     endif 
+
+    ! anneal
+    ! save
+    ! deallocate
 end program polarizedsquare_simulation
 
 
