@@ -32,12 +32,19 @@ open:
 POLSQU_MOD=polsqu2x2_mod
 POLSQU_SIM=polsqu2x2_sim
 
-POLSQU_TEST: clean
+polsqu_test: clean
 	# compile module, simulation program
 	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(POLSQU_SIM).f90
 	# link module and program
 	$(FORT) -o polsqu_test.ex $(POLSQU_SIM).o $(POLSQU_MOD).o
 	./polsqu_test.ex 0
+
+polsqu_run: clean
+	# compile module, simulation program
+	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(POLSQU_SIM).f90
+	# link module and program
+	$(FORT) -o polsqu_test.ex $(POLSQU_SIM).o $(POLSQU_MOD).o
+	./polsqu_test.ex 1
 
 # rod3_test: clean
 # 	$(FORT) $(DEBUG) $(FORTBIN)/$(ROD3_FILE)

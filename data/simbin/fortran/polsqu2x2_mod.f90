@@ -76,9 +76,9 @@ integer, parameter :: mmiounit = 18
 ! ** animation settings *************************************
 integer :: moviesph = 0 ! movie making status of simulation as spheres: 0 == off, 1 == on
 integer :: moviesqu = 1 ! movie making status of simulation as squares: 0 == off, 1 == on
-real(kind=dbl) :: movfreq = 200.0 ! frequency to take snapshots of movies [reduced seconds]
-
-
+real(kind=dbl) :: squmovfreq = 200.0 ! frequency to take snapshots of movies [reduced seconds]
+real(kind=dbl) :: sphmovfreq = 200.0 ! frequency to take snapshots of sphere movies
+! TODO :: adjust movie making so that square and sphere movies can happen at different frequencies
 
 ! ** SIMULATION SETTINGS *************************************
 ! boolean and default constants for values used to initia-
@@ -173,8 +173,8 @@ real(kind=dbl), parameter :: onbond = sigma1 + delta ! outer bond distance
 real(kind=dbl), parameter :: icbond = sqrt(2 * sigma1) - delta ! inner cross bond distance
 real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bond distance
 ! ** anderson thermostat *************************************
-logical, parameter :: thermostat = .true. ! anderson thermostat status: .false. == off, .true. == on
-real(kind=dbl), parameter :: thermal_conductivity = 200.0 ! the thermal conductivity of the hardsphere system [THIS VALUE HAS NOT BEEN VERIFIED!!]
+logical :: thermostat = .true. ! anderson thermostat status: .false. == off, .true. == on
+real(kind=dbl) :: thermal_conductivity = 200.0 ! the thermal conductivity of the hardsphere system [THIS VALUE HAS NOT BEEN VERIFIED!!]
 
 ! ** order parameters ****************************************
 integer, parameter :: orderlength = 15
@@ -400,7 +400,7 @@ function single_step () result (stop)
     end if 
 
     ! take snap shot for movie generation as spheres
-    if (((moviesph == 1) .or. (moviesqu == 1)) .and. (real(movno) < (timenow / movfreq))) then 
+    if (((moviesph == 1) .or. (moviesqu == 1)) .and. (real(movno) < (timenow / squmovfreq))) then 
         if (moviesph == 1) call record_position_circles ()
         if (moviesqu == 1) call record_position_squares ()
         movno = movno + 1
@@ -434,14 +434,14 @@ subroutine initialize_simulation_settings (af, ac, t, e, nc)
             use_default_cell = .false.
         endif
     endif
-    write (*,"('initialize_settings :: lattice cells set to ', I3)") cell
+    write (*,"(' initialize_settings :: lattice cells set to ', I3)") cell
 
     if (present(af)) then 
         if (set_areafraction(af)) then 
             use_default_areafraction = .false.
         endif
     endif
-    write (*,"('initialize_settings :: area fraction set to ', F5.3)") eta
+    write (*,"(' initialize_settings :: area fraction set to ', F5.3)") eta
 
     if (present(ac)) then 
         if (set_achirality(ac)) then 
@@ -449,21 +449,21 @@ subroutine initialize_simulation_settings (af, ac, t, e, nc)
         endif
         write (*,*) "initialize_settings :: a-chirality fraction of squares was specified."
     endif 
-    write (*,"('initialize_settings :: a-chirality fraction set to ', F5.3)") xa
+    write (*,"(' initialize_settings :: a-chirality fraction set to ', F5.3)") xa
 
     if (present(t)) then 
         if (set_temperature(t)) then 
             use_default_temperature = .false.
         endif
     endif
-    write (*,"('initialize_settings :: simulation temperature set to ', F5.3)") temperature
+    write (*,"(' initialize_settings :: simulation temperature set to ', F5.3)") temperature
 
     if (present(e)) then 
         if (set_events(e)) then 
             use_default_events = .false.
         endif 
     endif
-    write (*,"('initialize_settings :: simulation events set to ', F5.1, ' million')") (real(total_events) / 1e6)
+    write (*,"(' initialize_settings :: simulation events set to ', F5.1, ' million')") (real(total_events) / 1e6)
 
     ! once settings have been loaded, initialize the relevant parameters
     ! parameters for initializing system
@@ -535,7 +535,7 @@ function set_cells(val) result (success)
     if (val < min_val) then 
         ! the value is outside the allowable range
         ! inform the user, exit unsuccessful
-        151 format ("SET LATTICE CELL :: value passed to method (", I4, ") is outside the allowable range ", &
+        151 format (" SET LATTICE CELL :: value passed to method (", I4, ") is outside the allowable range ", &
             "(MIN = ", I4,"). Lattice cells set to default value (", I4,").")
         write (*,151) val, min_val, default_val
         success = .false.
@@ -607,7 +607,7 @@ function set_events(val) result (success)
     if (val < min_val) then 
         ! the value is outside the allowable range
         ! inform the user, exit unsuccessful
-        151 format ("SET EVENTS :: value passed to method (", F5.1, " million) is outside the allowable range ", &
+        151 format (" SET EVENTS :: value passed to method (", F5.1, " million) is outside the allowable range ", &
             "(MIN = ", I4,"). Lattice cells set to default value (", F5.1," million).")
         write (*,151) (real(val) / 1e6), min_val, (real(default_val) / 1e6)
         success = .false.
@@ -615,6 +615,149 @@ function set_events(val) result (success)
     total_events = val 
     success = .true.
 end function set_events
+
+subroutine set_sphere_movie (status, freq)
+    implicit none 
+    logical, intent(in), optional :: status 
+    ! boolean that determines if movie should be turned on or off
+    real, intent(in), optional :: freq
+    ! frequency of movie making in simulation seconds
+
+    if (present(status)) then 
+        if (status) then 
+            ! if the status is .true.
+            ! turn on the movie 
+            moviesph = 1 
+            write (*,*) "sphere_movie :: sphere movie making status was turned on."
+        else
+            ! turn off the movie
+            moviesph = 0
+            write (*,*) "sphere_movie :: sphere movie making status was turned off."
+        endif 
+    endif
+
+    if (present(freq)) then 
+        ! check that the value is greater than zero
+        if (freq < 0) then 
+            ! frequency value is less than zero
+            1 format(" sphere_movie :: unable to assign sphere movie frequency. ", &
+                "value (", F6.1,") passed to method is less than zero.")
+            write (*,1) freq 
+        else
+            ! frequency value is greater than zero 
+            sphmovfreq = freq
+            2 format (" sphere_movie :: sphere movie making frequency set to ", &
+                "every ", F6.1," simulations second(s).")
+            write (*,2) sphmovfreq
+        endif
+    endif
+
+    ! report to user status of movie making stauts
+    if (moviesph == 1) then 
+        ! movie making status is on
+        3 format (" sphere_movie :: sphere movie making status is on and set to ", &
+        "every ", F6.1, " simulation seconds." )
+        write (*,3) sphmovfreq
+    else
+        ! movie making status is off
+        write (*,*) "sphere_movie :: sphere movie making status is off."
+    endif
+end subroutine set_sphere_movie
+
+subroutine set_square_movie (status, freq)
+    implicit none 
+    logical, intent(in), optional :: status 
+    ! boolean that determines if movie should be turned on or off
+    real, intent(in), optional :: freq
+    ! frequency of movie making in simulation seconds
+
+    if (present(status)) then 
+        if (status) then 
+            ! if the status is .true.
+            ! turn on the movie 
+            moviesqu = 1 
+            write (*,*) "square_movie :: sphere movie making status was turned on."
+        else
+            ! turn off the movie
+            moviesqu = 0
+            write (*,*) "square_movie :: sphere movie making status was turned off."
+        endif 
+    endif
+
+    if (present(freq)) then 
+        ! check that the value is greater than zero
+        if (freq < 0) then 
+            ! frequency value is less than zero
+            1 format(" square_movie :: unable to assign sphere movie frequency. ", &
+                "value (", F6.1,") passed to method is less than zero.")
+            write (*,1) freq 
+        else
+            ! frequency value is greater than zero 
+            squmovfreq = freq
+            2 format (" square_movie :: sphere movie making frequency set to ", &
+                "every ", F6.1," simulations second(s).")
+            write (*,2) squmovfreq
+        endif
+    endif
+
+    ! report to user status of movie making stauts
+    if (moviesqu == 1) then 
+        ! movie making status is on
+        3 format (" square_movie :: sphere movie making status is on and set to ", &
+        "every ", F6.1, " simulation seconds." )
+        write (*,3) squmovfreq
+    else
+        ! movie making status is off
+        write (*,*) "square_movie :: sphere movie making status is off."
+    endif
+end subroutine set_square_movie
+
+subroutine set_thermostat (status, freq) 
+    implicit none 
+    logical, intent(in), optional :: status 
+    ! boolean that determines if thermostat should be turned on or off
+    real, intent(in), optional :: freq
+    ! frequency of thermostat ghost collisions per particle
+
+    if (present(status)) then 
+        if (status) then 
+            ! turn on the thermostat
+            thermostat = .true.
+            write (*,*) "set_thermostat :: thermostat status was turned on."
+        else
+            ! turn off the thermostat
+            thermostat = .false.
+            write (*,*) "set_thermostat :: thermostat status was turned off."
+        endif 
+    endif
+
+    if (present(freq)) then 
+        ! check that the value is greater than zero
+        if (freq < 0) then 
+            ! frequency value is less than zero
+            1 format(" set_thermostat :: unable to assign thermostat ghost collision frequency. ", &
+                "value (", F6.1,") passed to method is less than zero.")
+            write (*,1) freq 
+        else
+            ! frequency value is greater than zero 
+            thermal_conductivity = freq
+            2 format (" set_thermostat :: thermostat ghost collision frequency set to ", &
+                "every ", F6.1," per particle.")
+            write (*,2) thermal_conductivity
+        endif
+    endif
+
+    ! report the status of the thermostat to the user
+    if (thermostat) then 
+        ! thermostat is on
+        3 format (" set_thermostat :: thermostat is on and thermostat ghost collision frequency is set to ", &
+        "every ", F6.1, " per particle." )
+        write (*,3) thermal_conductivity
+    else
+        ! thermostat is off
+        write (*,*) "set_thermostat :: thermostat is off."
+    endif
+end subroutine set_thermostat
 
 ! ** type(id) functions **************************************
 
@@ -695,7 +838,6 @@ subroutine initialize_system ()
     ! allocate arrays
     allocate(square(cube))
     allocate(eventTree(mols+1))
-    call exit()
 
     ! initialize groupings
     call reset_state ()
@@ -908,7 +1050,7 @@ subroutine set_position ()
     	do
             attempts = attempts + 1
             success = 0
-            !call random_position (success)
+            call random_position (success)
     		if (success == 1) then 
                 write(simiounit,*) 'set_position: position vectors were generated using random walk algorithm'
                 exit
