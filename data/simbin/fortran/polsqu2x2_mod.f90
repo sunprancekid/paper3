@@ -175,6 +175,20 @@ real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bon
 ! ** anderson thermostat *************************************
 logical :: thermostat = .true. ! anderson thermostat status: .false. == off, .true. == on
 real(kind=dbl) :: thermal_conductivity = 200.0 ! the thermal conductivity of the hardsphere system [THIS VALUE HAS NOT BEEN VERIFIED!!]
+! TODO :: specify temperature when the thermostat is turned on
+! TODO :: adjust thermostat frequency calculations to per particle
+!   so that the frequency is constant across simulations of different sizes
+! TODO :: add external field methods
+! ** external field ******************************************
+logical :: field = .false. ! boolean controlling stochastic external field
+logical :: field_rotation = .false. ! boolean controlling field rotation, if field is on
+logical :: field_toggel = .false. ! boolean controlling field toggeling, if field is on
+real(kind=dbl), parameter :: default_field_stength = 0.5
+! default external field strength, if field is turned on
+real(kind=dbl), parameter :: default_field_angvel = 200.
+! default external field rotational velocity, if the field / field rotation is turned on
+! real(kind=dbl), parameter :: default_field_togfreq
+! default external field switching frequency, if the field / field toggeling is turned on
 
 ! ** order parameters ****************************************
 integer, parameter :: orderlength = 15
@@ -308,6 +322,10 @@ logical :: nbrnow ! update neighbor list?
 type(node), dimension(:), allocatable :: eventTree ! binary tree list used for scheduling collision events
 integer :: rootnode ! pointer to first node of binary tree using for scheduling collision events
 real(kind=dbl) :: tsl, tl ! used for false positioning method: time since last update and time of last update
+! ** stoachstic external field *******************************
+real(kind=dbl) :: external_field_strength = default_field_stength
+real(kind=dbl) :: external_field_angvel = default_field_angvel
+real(kind=dbl) :: mag_force, mag_freq, mag_period
 ! ** markovian milestoning ***********************************
 logical :: milestone ! boolean that determintes whether milestoning procedure is on or off
 integer :: boundary_index ! index assigned to state of milestone denoting the most recent boundary
@@ -736,7 +754,7 @@ subroutine set_thermostat (status, freq)
         if (freq < 0) then 
             ! frequency value is less than zero
             1 format(" set_thermostat :: unable to assign thermostat ghost collision frequency. ", &
-                "value (", F6.1,") passed to method is less than zero.")
+                "value passed to method (", F6.1,") is less than zero.")
             write (*,1) freq 
         else
             ! frequency value is greater than zero 
@@ -758,6 +776,68 @@ subroutine set_thermostat (status, freq)
         write (*,*) "set_thermostat :: thermostat is off."
     endif
 end subroutine set_thermostat
+
+subroutine set_external_field (status, strength, freq, force) 
+    implicit none 
+    logical, intent(in), optional :: status 
+    ! boolean that determines if external field should be turned on or off
+    real, intent(in), optional :: strength
+    ! dimensionless strength of the external field
+    real, intent(in), optional :: freq
+    ! frequency that particles experience ghost collisions from the field
+    real, intent(in), optional :: force 
+    ! strength of impulsive force that charged particles experience during 
+    ! an external field ghost collision
+
+    if (present(status)) then 
+        if (status) then 
+            ! turn on the external field
+            field = .true.
+            write (*,*) "set_external_field :: external field status was turned on."
+        else
+            ! turn off the external field
+            field = .false.
+            write (*,*) "set_external_field :: external field status was turned off."
+        endif 
+    endif
+
+    if (present(strength)) then 
+        ! check that the value is greater than zero
+        if (strength < 0) then 
+            ! value is less than zero
+            1 format(" set_external_field :: unable to assign external field strength. ", &
+                "value passed to method (", F5.3,") is less than zero.")
+            write (*,1) strength 
+        else
+            ! external field strength value is greater than zero 
+            external_field_strength = strength
+            2 format (" set_external_field :: external field ghost collision frequency set to ", &
+                F5.3,".")
+            write (*,2) external_field_strength
+        endif
+    endif
+
+    ! initialize external field parameters
+    mag_force = sqrt(2. * temperature) ! impulsive force that each charge 
+    ! is assigned during a stochastic external field event
+    mag_freq = (1. * external_field_strength / &
+        (1. * sqrt(2. * temperature))) * cube 
+    ! frequency that groups experience ghost collisions from the field
+    mag_period = 1. / mag_freq
+    ! inevrse of frequency, simulation seconds until next field event
+
+    ! report the status of the external field to the user
+    if (field) then 
+        ! external field is on
+        3 format (" set_external_field :: external field is on and external field strength is set to ", &
+        F5.3, "." )
+        write (*,3) external_field_strength
+    else
+        ! external field is off
+        write (*,*) "set_external_field :: external field is off."
+    endif
+
+end subroutine
 
 ! ** type(id) functions **************************************
 
