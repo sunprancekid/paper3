@@ -42,7 +42,7 @@ real(kind=dbl), parameter :: twopi = 2. * pi
 real(kind=dbl), parameter :: halfpi = pi / 2.
 real(kind=dbl), parameter :: bigtime = 1e10 ! unreasonably large time
 integer, parameter :: NONZERO_EXITCODE = 85
-integer, parameter :: CHECKPOINT_EXITCODE = 120 
+integer, parameter :: CHECKPOINT_EXITCODE = 0
 ! ** colors (rbg format) *************************************
 character(len=12), parameter :: red = ' 1 0.15 0.15'
 character(len=12), parameter :: blue = ' 0.1 1 0.3'
@@ -55,7 +55,7 @@ integer, parameter :: ndim = 2 ! number of dimensions
 integer, parameter :: mer = 4 ! number of hardspheres which make one cube
 real(kind=dbl), parameter :: excluded_area = 1. + ((3. / 4.) * pi) ! area occupied by one 2x2 square
 real(kind=dbl), parameter :: tol = 0.001 ! amount by which to allow mistakes from numberical integration (i.e. overlap and bcs)
-integer, parameter :: debug = 0 ! debugging status: 0 == off, 1 == on, 2 == extra on 
+integer, parameter :: debug = 2 ! debugging status: 0 == off, 1 == on, 2 == extra on 
 ! ** file management *****************************************
 character(len=15), parameter :: simtitle = 'polsqu2x2'
 character(len=20), parameter :: simid = 'test'
@@ -283,7 +283,8 @@ end type node
 !*************************************************************
 
 ! simulation settings
-
+! ** debugging status
+! integer :: debug = default_debug_status
 ! ** simulation molecules ************************************ 
 type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
 ! ** simulation parameters ***********************************
@@ -380,6 +381,10 @@ function single_step () result (stop)
         call ghost_reschedule (ghost_event%partner%one) ! update calander for each circle in 
         ghost_event = predict_ghost(thermostat_period) ! schedule next ghost collision
         call addbranch (eventTree, mols+1)
+    else if (a%one == (cube + 2)) then 
+        ! field ghost event
+        write (*,*) "TODO :: implement field ghost collision event."
+        call exit()
     else ! collision event 
         call collide (a, b, next_event, pv%value)
         call collision_reschedule (a, b)
@@ -442,6 +447,36 @@ function single_step () result (stop)
 end function single_step
 
 ! SIMULATION SETTINGS FUNCTIONS
+
+! subroutine set_debug_status (status)
+!     implicit none 
+!     integer, intent(in), optional :: status 
+!     ! integer determining the boolean that should be assigned
+!     ! to the debuggin status
+!     logical :: use_default = .true.
+
+!     if (present(status)) then 
+!         ! check that the integer passed to the method is within the valid range
+!         if ((status < 0) .or. (status > 2)) then 
+!             1 format (" set_debug_status :: value passed to method (", I3,") is outside valid range.")
+!             write (*,1) status
+!         else 
+!             use_default = .false.
+!             debug = status
+!             2 format(" set_debug_status :: debugging status was set to (", I3,").")
+!             write (*,2) debug
+!         endif
+!     endif
+
+!     if (use_default) then 
+!         ! assign the default debugging status
+!         debug = default_debug_status
+!         3 format(" set_debug_status :: default debugging status was assigned (debug = ", &
+!             I4,").")
+!         write (*,3) debug
+!     endif
+
+! end subroutine set_debug_status
 
 subroutine initialize_simulation_settings (af, ac, e, nc)
     implicit none 
@@ -933,7 +968,9 @@ subroutine initialize_system ()
 
     ! allocate arrays
     allocate(square(cube))
-    allocate(eventTree(mols+1))
+    allocate(eventTree(mols+2))
+    ! events for all discs plus events for each stochastic 
+    ! ghost event
 
     ! initialize groupings
     call reset_state ()
@@ -2940,6 +2977,11 @@ subroutine half_forward ()
             a%one = cube + 1
             a%two = 0
             b = ghost_event%partner
+        elseif (i == mols + 2) then ! field event
+            next_event = field_event
+            a%one = cube + 2 
+            a%two = 0
+            b = field_event%partner
         endif
 
         ! notify user about next event
@@ -2983,6 +3025,7 @@ subroutine half_forward ()
         end do 
     end do 
     ghost_event%time = ghost_event%time - next_event%time
+    field_event%time = field_event%time - next_event%time
     if (debug >= 1) then 
         if (check_boundaries()) then 
             write (*,*) 'forward: bounary overlap. program will abort now'
@@ -3015,6 +3058,11 @@ subroutine forward (next_event, a, b)
             a%one = cube + 1
             a%two = 0
             b = ghost_event%partner
+        elseif (i == mols + 2) then ! field event
+            next_event = field_event
+            a%one = cube + 2 
+            a%two = 0
+            b = field_event%partner
         endif
 
         ! notify user about next event
@@ -3055,6 +3103,7 @@ subroutine forward (next_event, a, b)
 		end do 
 	end do 
     ghost_event%time = ghost_event%time - next_event%time
+    field_event%time = field_event%time - next_event%time
     if (debug >= 1) then 
         if (check_boundaries()) then 
             write (*,*) 'forward: bounary overlap. program will abort now'
@@ -3597,6 +3646,10 @@ subroutine complete_reschedule()
     ! schedule thermostat ghost event
     ghost_event = predict_ghost(thermostat_period)
     if (thermostat) call addbranch (eventTree, mols+1)
+
+    ! schedule field ghost event
+    field_event = predict_ghost(field_period)
+    if (field) call addbranch (eventTree, mols+2)
 end subroutine complete_reschedule
 
 subroutine collision_reschedule(a, b)
@@ -3824,7 +3877,7 @@ end subroutine build_neighborlist
 subroutine initialize_binarytree(tree)
     implicit none
     ! ** calling variables ***********************************
-    type(node), dimension(mols+1), intent(out) :: tree
+    type(node), dimension(mols+2), intent(out) :: tree
     ! ** local variables *************************************
     integer :: i ! indexing parameter
     type(id) :: a ! indexing parameter
@@ -3832,7 +3885,7 @@ subroutine initialize_binarytree(tree)
     ! reset initial node of binary tree 
     rootnode = 0
     ! loop through each node and reset pointers to zero 
-    do i = 1, mols+1 
+    do i = 1, mols+2
         tree(i)%lnode = 0
         tree(i)%rnode = 0
         tree(i)%pnode = 0
@@ -3842,7 +3895,7 @@ end subroutine initialize_binarytree
 integer function findnextevent(tree)
     implicit none
     ! ** calling variables ***********************************
-    type(node), dimension(mols+1), intent(inout) :: tree ! binary tree
+    type(node), dimension(mols+2), intent(inout) :: tree ! binary tree
     ! ** local variables *************************************
     integer :: nextnode
 
@@ -3858,7 +3911,7 @@ end function findnextevent
 subroutine addbranch(tree, newnode)
     implicit none
     ! ** calling variables ***********************************
-    type(node), dimension(mols+1), intent(inout) :: tree ! binary tree
+    type(node), dimension(mols+2), intent(inout) :: tree ! binary tree
     integer, intent(in) :: newnode ! node to be added to tree
     ! ** local variables *************************************
     type(id) :: a ! id of particle corresponding to node
@@ -3875,11 +3928,16 @@ subroutine addbranch(tree, newnode)
             call delbranch (tree, newnode)
         endif
         ! save the time of the next event
-        if (newnode <= mols) then ! for collision events
+        if (newnode <= mols) then 
+            ! collision event
             a = mol2id(newnode)
             tnew = square(a%one)%circle(a%two)%schedule%time
-        else ! for ghost events
+        else if (newnode == mols + 1) then
+            ! thermostat event
             tnew = ghost_event%time
+        else if (newnode == mols + 2) then 
+            ! field event 
+            tnew = field_event%time
         endif
 
         ! search through all branches to find the proper insert position
@@ -3889,10 +3947,15 @@ subroutine addbranch(tree, newnode)
             if (nfound) exit
             ! calculate the time of comparison node's event
             if (ncomp <= mols) then 
+                ! for collision events
                 a = mol2id(ncomp)
                 tcomp = square(a%one)%circle(a%two)%schedule%time
-            else
+            else if (ncomp == mols + 1) then 
+                ! thermostat event
                 tcomp = ghost_event%time
+            else if (ncomp == mols + 1) then 
+                ! field event 
+                tcomp = field_event%time
             endif
 
             if (tnew <= tcomp) then ! if the new event is sooner than the current node event
@@ -3923,7 +3986,7 @@ end subroutine addbranch
 subroutine delbranch(tree, nonode)
     implicit none
     ! ** calling variables ***********************************
-    type(node), dimension(mols+1), intent(inout) :: tree ! binary tree
+    type(node), dimension(mols+2), intent(inout) :: tree ! binary tree
     integer, intent(in) :: nonode ! mold id of particle whose node is being deleted from tree
     ! ** local variables *************************************
     integer :: ns, np ! pointers used for relinking
