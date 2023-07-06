@@ -55,7 +55,7 @@ integer, parameter :: ndim = 2 ! number of dimensions
 integer, parameter :: mer = 4 ! number of hardspheres which make one cube
 real(kind=dbl), parameter :: excluded_area = 1. + ((3. / 4.) * pi) ! area occupied by one 2x2 square
 real(kind=dbl), parameter :: tol = 0.001 ! amount by which to allow mistakes from numberical integration (i.e. overlap and bcs)
-integer, parameter :: debug = 2 ! debugging status: 0 == off, 1 == on, 2 == extra on 
+integer, parameter :: debug = 1 ! debugging status: 0 == off, 1 == on, 2 == extra on 
 ! ** file management *****************************************
 character(len=15), parameter :: simtitle = 'polsqu2x2'
 character(len=20), parameter :: simid = 'test'
@@ -326,12 +326,12 @@ real(kind=dbl) :: tsl, tl ! used for false positioning method: time since last u
 ! ** andersen thermostat *************************************
 real(kind=dbl) :: temperature = default_temperature ! temperature set point of thermostat
 real(kind=dbl) :: thermostat_freq, thermostat_period
-type(event) :: ghost_event ! ghost collision event 
+type(event) :: thermostat_event ! thermostat ghost collision event 
 ! ** stochastic external field *******************************
 real(kind=dbl) :: external_field_strength = default_field_stength
 real(kind=dbl) :: external_field_angvel = default_field_angvel
 real(kind=dbl) :: field_force, field_freq, field_period
-type(event) :: field_event ! ghost collision event 
+type(event) :: field_event ! external field ghost collision event 
 ! ** markovian milestoning ***********************************
 logical :: milestone ! boolean that determintes whether milestoning procedure is on or off
 integer :: boundary_index ! index assigned to state of milestone denoting the most recent boundary
@@ -378,13 +378,13 @@ function single_step () result (stop)
     ! process next event 
     if (a%one == (cube + 1)) then ! ghost collision event 
         call ghost_collision (tempset)
-        call ghost_reschedule (ghost_event%partner%one) ! update calander for each circle in 
-        ghost_event = predict_ghost(thermostat_period) ! schedule next ghost collision
+        call ghost_reschedule (thermostat_event%partner%one) ! update calander for each circle in 
+        thermostat_event = predict_ghost(thermostat_period) ! schedule next ghost collision
         call addbranch (eventTree, mols+1)
     else if (a%one == (cube + 2)) then 
         ! field ghost event
         write (*,*) "TODO :: implement field ghost collision event."
-        call exit()
+        call exit(NONZERO_EXITCODE)
     else ! collision event 
         call collide (a, b, next_event, pv%value)
         call collision_reschedule (a, b)
@@ -804,12 +804,12 @@ subroutine set_thermostat (status, temp, freq)
             3 format (" set_thermostat :: thermostat ghost collision frequency set to ", &
                 "every ", F6.1," per particle.")
             write (*,3) freq
-            thermostat_freq = (density ** (1./2.)) / (freq * cube)
+            thermostat_freq = (freq * cube)/ (density ** (1./2.))
         endif
     else
         ! if a frequency was not passed to the method
         ! assign the default frequency
-        thermostat_freq = (density ** (1./2.)) / (default_thermostat_freq * cube)
+        thermostat_freq = (default_thermostat_freq * cube) / (density ** (1./2.))
     endif
 
     ! initialize thermostat parameters
@@ -2973,10 +2973,10 @@ subroutine half_forward ()
             next_event = square(a%one)%circle(a%two)%schedule
             b = square(a%one)%circle(a%two)%schedule%partner
         elseif (i == mols+1) then ! ghost event
-            next_event = ghost_event
+            next_event = thermostat_event
             a%one = cube + 1
             a%two = 0
-            b = ghost_event%partner
+            b = thermostat_event%partner
         elseif (i == mols + 2) then ! field event
             next_event = field_event
             a%one = cube + 2 
@@ -2991,8 +2991,11 @@ subroutine half_forward ()
                 110 format(' event ', I8, ' in ', F8.5, ' seconds: ', I3, ' of ', I5, ' will collide with ', &
                     I3,' of ', I5, ' (type ', I3,').')
             else if (a%one == (cube + 1)) then 
-                write (simiounit, 120) n_events, next_event%time, b%one 
-                    120 format(' event ', I8, ' in ', F8.5, ' seconds: group ', I5,' will collide with a ghost particle')
+                write (simiounit, 120) n_events, next_event%time
+                    120 format(' event ', I8, ' in ', F8.5, ' seconds: thermostat ghost collision event.')
+            else if (a%one == (cube + 2)) then 
+                write (simiounit, 130) n_events, next_event%time
+                130 format (' event ', I8, ' in ', F8.5, ' seconds: field ghost collision event.')
             end if 
         endif
 
@@ -3024,7 +3027,7 @@ subroutine half_forward ()
             square(i)%circle(m)%schedule%time = square(i)%circle(m)%schedule%time - next_event%time 
         end do 
     end do 
-    ghost_event%time = ghost_event%time - next_event%time
+    thermostat_event%time = thermostat_event%time - next_event%time
     field_event%time = field_event%time - next_event%time
     if (debug >= 1) then 
         if (check_boundaries()) then 
@@ -3054,10 +3057,10 @@ subroutine forward (next_event, a, b)
             next_event = square(a%one)%circle(a%two)%schedule
             b = square(a%one)%circle(a%two)%schedule%partner
         elseif (i == mols+1) then ! ghost event
-            next_event = ghost_event
+            next_event = thermostat_event
             a%one = cube + 1
             a%two = 0
-            b = ghost_event%partner
+            b = thermostat_event%partner
         elseif (i == mols + 2) then ! field event
             next_event = field_event
             a%one = cube + 2 
@@ -3072,8 +3075,11 @@ subroutine forward (next_event, a, b)
     			110 format(' event ', I8, ' in ', F8.5, ' seconds: ', I3, ' of ', I5, ' will collide with ', &
                     I3,' of ', I5, ' (type ', I3,').')
     		else if (a%one == (cube + 1)) then 
-                write (simiounit, 120) n_events, next_event%time, b%one 
-                    120 format(' event ', I8, ' in ', F8.5, ' seconds: group ', I5,' will collide with a ghost particle')
+                write (simiounit, 120) n_events, next_event%time
+                120 format(' event ', I8, ' in ', F8.5, ' seconds: thermostat ghost collision event.')
+            else if (a%one == (cube + 2)) then 
+                write (simiounit, 130) n_events, next_event%time
+                130 format (' event ', I8, ' in ', F8.5, ' seconds: field ghost collision event.')
     		end if 
     	endif
 
@@ -3102,7 +3108,7 @@ subroutine forward (next_event, a, b)
             square(i)%circle(m)%schedule%time = square(i)%circle(m)%schedule%time - next_event%time 
 		end do 
 	end do 
-    ghost_event%time = ghost_event%time - next_event%time
+    thermostat_event%time = thermostat_event%time - next_event%time
     field_event%time = field_event%time - next_event%time
     if (debug >= 1) then 
         if (check_boundaries()) then 
@@ -3580,7 +3586,7 @@ subroutine ghost_collision(temperature)
     n_ghost = n_ghost + 1
 
     sigma = sqrt(temperature)
-    i = ghost_event%partner%one
+    i = thermostat_event%partner%one
 	do m = 1, mer ! for every sphere in the square formation 
 		do q = 1, ndim
             ! save the real position of each particle 
@@ -3644,7 +3650,7 @@ subroutine complete_reschedule()
     enddo
 
     ! schedule thermostat ghost event
-    ghost_event = predict_ghost(thermostat_period)
+    thermostat_event = predict_ghost(thermostat_period)
     if (thermostat) call addbranch (eventTree, mols+1)
 
     ! schedule field ghost event
@@ -3934,7 +3940,7 @@ subroutine addbranch(tree, newnode)
             tnew = square(a%one)%circle(a%two)%schedule%time
         else if (newnode == mols + 1) then
             ! thermostat event
-            tnew = ghost_event%time
+            tnew = thermostat_event%time
         else if (newnode == mols + 2) then 
             ! field event 
             tnew = field_event%time
@@ -3952,8 +3958,8 @@ subroutine addbranch(tree, newnode)
                 tcomp = square(a%one)%circle(a%two)%schedule%time
             else if (ncomp == mols + 1) then 
                 ! thermostat event
-                tcomp = ghost_event%time
-            else if (ncomp == mols + 1) then 
+                tcomp = thermostat_event%time
+            else if (ncomp == mols + 2) then 
                 ! field event 
                 tcomp = field_event%time
             endif
@@ -4114,47 +4120,4 @@ subroutine update_positions()
 end subroutine update_positions
 
 end module polarizedsquaremodule
-
-! program polsqu_sim
-!     use polarizedsquaremodule
-!     implicit none
-!     integer, parameter :: N_ARGS = 3 ! number of arguments accepted by simulation file
-!     integer :: a  ! number of arguments determined by program
-!     character(len=12), dimension(:), allocatable :: args
-
-!     ! parse the number of arguments passed to the program
-!     a = command_argument_count()
-!     if (a /= N_ARGS) then 
-!         write (*, *) 'Incorrect number of arguments passed to simulation executable.'
-!         write (*, 2) a, N_ARGS
-!         write (*, *) 'USAGE: ./polsqu_sim [EXECUTE CODE] [LOWER NEM. BOUND] [UPPER NEM. BOUND]'
-!         2 format (I2," arguments passed to polsqu_sim when only ", I02," arguments are allowed.")
-!         call exit(NONZERO_EXITCODE)
-!     endif
-!     allocate(args(a))
-
-!     ! parse arguments
-!     do a = 1, N_ARGS 
-!         ! parse argument 
-!         call get_command_argument(a,args(a))
-!     enddo
-
-!     ! load system
-!     ! system will be initialized if save files are not present
-!     call initialize_system()
-
-!     ! set the upper and lower simulation boundaries
-!     read(args(2), '(f4.3)') lower_nematic_boundary
-!     read(args(3), '(f4.3)') upper_nematic_boundary
-
-!     ! save
-!     call save()
-
-!     ! run the simulation if the parameters are met
-!     if (trim(args(1)) == '1') then
-!         do
-!             if (single_step()) exit
-!         enddo
-!     endif 
-! end program polsqu_sim
 
