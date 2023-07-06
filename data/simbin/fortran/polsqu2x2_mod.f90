@@ -111,13 +111,6 @@ real(kind=dbl) :: xa = default_achairality
 logical :: use_default_achairality = .true.
 
 ! TEMPERATURE
-! assigned system temperature, used to initialize the velocity
-! of simulation particles
-real(kind=dbl), parameter :: default_temperature = 1.5
-real(kind=dbl), parameter :: max_temperature = 10.
-real(kind=dbl), parameter :: min_temperature = 0.001
-real(kind=dbl) :: temperature = default_temperature
-logical :: use_default_temperature = .true.
 
 ! SIMULATION LENGTH
 ! length of simulation defined as the number of collision events
@@ -172,8 +165,16 @@ real(kind=dbl), parameter :: inbond = sigma1 - delta ! inner bond distance
 real(kind=dbl), parameter :: onbond = sigma1 + delta ! outer bond distance
 real(kind=dbl), parameter :: icbond = sqrt(2 * sigma1) - delta ! inner cross bond distance
 real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bond distance
-! ** anderson thermostat *************************************
-logical :: thermostat = .true. ! anderson thermostat status: .false. == off, .true. == on
+! ** andersen thermostat *************************************
+! assigned system temperature, used to initialize the velocity
+! of simulation particles
+real(kind=dbl), parameter :: default_temperature = 0.5
+real(kind=dbl), parameter :: max_temperature = 10.
+real(kind=dbl), parameter :: min_temperature = 0.001
+logical :: use_default_temperature = .true.
+logical :: thermostat = .false. ! anderson thermostat status: .false. == off, .true. == on
+real(kind=dbl), parameter :: default_thermostat_freq = 0.2
+! default frequency that particles should experience thermostat ghost collisions
 real(kind=dbl) :: thermal_conductivity = 200.0 ! the thermal conductivity of the hardsphere system [THIS VALUE HAS NOT BEEN VERIFIED!!]
 ! TODO :: specify temperature when the thermostat is turned on
 ! TODO :: adjust thermostat frequency calculations to per particle
@@ -285,7 +286,6 @@ end type node
 
 ! ** simulation molecules ************************************ 
 type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
-type(event) :: ghost_event ! ghost collision event 
 ! ** simulation parameters ***********************************
 real(kind=dbl) :: timenow ! current length of simulation 
 real(kind=dbl) :: timeperiod ! current length of period 
@@ -322,10 +322,15 @@ logical :: nbrnow ! update neighbor list?
 type(node), dimension(:), allocatable :: eventTree ! binary tree list used for scheduling collision events
 integer :: rootnode ! pointer to first node of binary tree using for scheduling collision events
 real(kind=dbl) :: tsl, tl ! used for false positioning method: time since last update and time of last update
-! ** stoachstic external field *******************************
+! ** andersen thermostat *************************************
+real(kind=dbl) :: temperature = default_temperature ! temperature set point of thermostat
+real(kind=dbl) :: thermostat_freq, thermostat_period
+type(event) :: ghost_event ! ghost collision event 
+! ** stochastic external field *******************************
 real(kind=dbl) :: external_field_strength = default_field_stength
 real(kind=dbl) :: external_field_angvel = default_field_angvel
-real(kind=dbl) :: mag_force, mag_freq, mag_period
+real(kind=dbl) :: field_force, field_freq, field_period
+type(event) :: field_event ! ghost collision event 
 ! ** markovian milestoning ***********************************
 logical :: milestone ! boolean that determintes whether milestoning procedure is on or off
 integer :: boundary_index ! index assigned to state of milestone denoting the most recent boundary
@@ -373,7 +378,7 @@ function single_step () result (stop)
     if (a%one == (cube + 1)) then ! ghost collision event 
         call ghost_collision (tempset)
         call ghost_reschedule (ghost_event%partner%one) ! update calander for each circle in 
-        ghost_event = predict_ghost() ! schedule next ghost collision
+        ghost_event = predict_ghost(thermostat_period) ! schedule next ghost collision
         call addbranch (eventTree, mols+1)
     else ! collision event 
         call collide (a, b, next_event, pv%value)
@@ -438,11 +443,10 @@ end function single_step
 
 ! SIMULATION SETTINGS FUNCTIONS
 
-subroutine initialize_simulation_settings (af, ac, t, e, nc)
+subroutine initialize_simulation_settings (af, ac, e, nc)
     implicit none 
     real, intent(in), optional :: af ! area fraction
     real, intent(in), optional :: ac ! a-chirality
-    real, intent(in), optional :: t ! temperature 
     integer, intent(in), optional :: e ! events 
     integer, intent(in), optional :: nc ! number of cells
 
@@ -468,13 +472,6 @@ subroutine initialize_simulation_settings (af, ac, t, e, nc)
         write (*,*) "initialize_settings :: a-chirality fraction of squares was specified."
     endif 
     write (*,"(' initialize_settings :: a-chirality fraction set to ', F5.3)") xa
-
-    if (present(t)) then 
-        if (set_temperature(t)) then 
-            use_default_temperature = .false.
-        endif
-    endif
-    write (*,"(' initialize_settings :: simulation temperature set to ', F5.3)") temperature
 
     if (present(e)) then 
         if (set_events(e)) then 
@@ -604,7 +601,7 @@ function set_temperature (val) result (success)
         ! if the value passed to the method is outside the allowable range
         ! inform the user and keep the default value
         152 format(" SET TEMPERATURE :: Value passed to method (", F5.3, ") is outside of range", &
-            " (MIN = ", F5.3,"). Area fraction set to default value of ", F5.3, ".")
+            " (MIN = ", F5.3,"). Temperature set to default value of ", F5.3, ".")
         write (*,152) val, min_val, default_val
         success = .false.
     endif
@@ -730,10 +727,12 @@ subroutine set_square_movie (status, freq)
     endif
 end subroutine set_square_movie
 
-subroutine set_thermostat (status, freq) 
+subroutine set_thermostat (status, temp, freq) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if thermostat should be turned on or off
+    real, intent(in), optional :: temp 
+    ! temperature set point of thermostat, strength of ghost collisions
     real, intent(in), optional :: freq
     ! frequency of thermostat ghost collisions per particle
 
@@ -749,28 +748,46 @@ subroutine set_thermostat (status, freq)
         endif 
     endif
 
+    if (present(temp)) then 
+        ! check that the value is greater than zero
+        if (set_temperature(temp)) then 
+            use_default_temperature = .false.
+            1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
+            write (*,1) temperature
+        endif
+    endif
+
     if (present(freq)) then 
         ! check that the value is greater than zero
         if (freq < 0) then 
             ! frequency value is less than zero
-            1 format(" set_thermostat :: unable to assign thermostat ghost collision frequency. ", &
+            2 format(" set_thermostat :: unable to assign thermostat ghost collision frequency. ", &
                 "value passed to method (", F6.1,") is less than zero.")
-            write (*,1) freq 
+            write (*,2) freq 
         else
             ! frequency value is greater than zero 
-            thermal_conductivity = freq
-            2 format (" set_thermostat :: thermostat ghost collision frequency set to ", &
+            3 format (" set_thermostat :: thermostat ghost collision frequency set to ", &
                 "every ", F6.1," per particle.")
-            write (*,2) thermal_conductivity
+            write (*,3) freq
+            thermostat_freq = (density ** (1./2.)) / (freq * cube)
         endif
+    else
+        ! if a frequency was not passed to the method
+        ! assign the default frequency
+        thermostat_freq = (density ** (1./2.)) / (default_thermostat_freq * cube)
     endif
+
+    ! initialize thermostat parameters
+    thermostat_period = (1. / thermostat_freq)
+    ! inevrse of frequency, simulation seconds until next thermostat event
+
 
     ! report the status of the thermostat to the user
     if (thermostat) then 
         ! thermostat is on
-        3 format (" set_thermostat :: thermostat is on and thermostat ghost collision frequency is set to ", &
-        "every ", F6.1, " per particle." )
-        write (*,3) thermal_conductivity
+        4 format (" set_thermostat :: thermostat is on and thermostat ghost collision frequency is set to ", &
+        F8.2, " per second." )
+        write (*,4) thermostat_freq
     else
         ! thermostat is off
         write (*,*) "set_thermostat :: thermostat is off."
@@ -812,32 +829,31 @@ subroutine set_external_field (status, strength, freq, force)
             ! external field strength value is greater than zero 
             external_field_strength = strength
             2 format (" set_external_field :: external field ghost collision frequency set to ", &
-                F5.3,".")
+                F5.3," per simulation second.")
             write (*,2) external_field_strength
         endif
     endif
 
     ! initialize external field parameters
-    mag_force = sqrt(2. * temperature) ! impulsive force that each charge 
+    field_force = sqrt(2. * temperature) ! impulsive force that each charge 
     ! is assigned during a stochastic external field event
-    mag_freq = (1. * external_field_strength / &
+    field_freq = (1. * external_field_strength / &
         (1. * sqrt(2. * temperature))) * cube 
     ! frequency that groups experience ghost collisions from the field
-    mag_period = 1. / mag_freq
+    field_period = 1. / field_freq
     ! inevrse of frequency, simulation seconds until next field event
 
     ! report the status of the external field to the user
     if (field) then 
         ! external field is on
         3 format (" set_external_field :: external field is on and external field strength is set to ", &
-        F5.3, "." )
+        F5.3, " per simulation second." )
         write (*,3) external_field_strength
     else
         ! external field is off
         write (*,*) "set_external_field :: external field is off."
     endif
-
-end subroutine
+end subroutine set_external_field
 
 ! ** type(id) functions **************************************
 
@@ -3532,13 +3548,13 @@ subroutine ghost_collision(temperature)
 	end do 
 end subroutine ghost_collision
 
-type(event) function predict_ghost()
+type(event) function predict_ghost(period)
     implicit none
-    ! ** calling variables ***********************************
-    ! ** local variables *************************************
+    real(kind=dbl), intent(in) :: period 
+    ! average time between collision events
 
-    predict_ghost%time = (density ** (1./2.)) / thermal_conductivity
-    predict_ghost%partner = random_cube ()
+    predict_ghost%time = period
+    predict_ghost%partner = random_cube()
     predict_ghost%type = -1
 end function predict_ghost
 
@@ -3577,8 +3593,9 @@ subroutine complete_reschedule()
         enddo
         call addbranch (eventTree, i)
     enddo
-    ! schedule new ghost event 
-    ghost_event = predict_ghost()
+
+    ! schedule thermostat ghost event
+    ghost_event = predict_ghost(thermostat_period)
     if (thermostat) call addbranch (eventTree, mols+1)
 end subroutine complete_reschedule
 
