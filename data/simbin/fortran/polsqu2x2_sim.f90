@@ -34,11 +34,11 @@ program polarizedsquare_simulation
     ! load settings
     ! TO THINK :: better to pass values to function, or set each
     ! parameter individually (probably the second one -> actually maybe the first? for cleanliness)
-    call initialize_simulation_settings(af = 0.5, e = 50000)
+    call initialize_simulation_settings(af = 0.2, e = 50000)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1.)
     call set_thermostat (status = .true., temp = 0.3, freq = 0.3)
-    call set_external_field (status = .true., strength = 0.1)
+    call set_external_field (status = .false., strength = 0.1)
     ! TODO :: add methods for turning property calculation on and off
     ! TODO :: add methods for renaming the simulation
 

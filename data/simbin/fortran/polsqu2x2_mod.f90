@@ -292,7 +292,7 @@ real(kind=dbl) :: timenow ! current length of simulation
 real(kind=dbl) :: timeperiod ! current length of period 
 real(kind=dbl) :: ghostrate ! frequency of ghost collision 
 real(kind=dbl) :: tempset ! current system temperature set point 
-integer :: n_events, n_col, n_ghost, n_bond, n_hard, n_well ! event counting
+integer :: n_events, n_col, n_ghost, n_thermostat, n_field, n_bond, n_hard, n_well ! event counting
 integer :: ghost ! downlist, uplist, and ghost event participants
 integer :: anneal ! number of times the simulation has reduced the temperature
 ! ** simulation properties ***********************************
@@ -376,13 +376,13 @@ function single_step () result (stop)
     call forward (next_event, a, b)
 
     ! process next event 
-    if (a%one == (cube + 1)) then ! ghost collision event 
-        call ghost_collision (tempset)
-        call ghost_reschedule (thermostat_event%partner%one) ! update calander for each circle in 
+    if (a%one == (cube + 1)) then 
+        ! thermostat ghost collision event 
+        call thermostat_ghost_collision (tempset)
         thermostat_event = predict_ghost(thermostat_period) ! schedule next ghost collision
         call addbranch (eventTree, mols+1)
     else if (a%one == (cube + 2)) then 
-        ! field ghost event
+        ! field ghost collision event
         write (*,*) "TODO :: implement field ghost collision event."
         call exit(NONZERO_EXITCODE)
     else ! collision event 
@@ -1099,6 +1099,8 @@ subroutine reset_state()
         read(saveiounit, *) n_events
         read(saveiounit, *) n_col
         read(saveiounit, *) n_ghost
+        read(saveiounit, *) n_thermostat
+        read(saveiounit, *) n_field
         read(saveiounit, *) n_bond
         read(saveiounit, *) n_hard
         read(saveiounit, *) n_well
@@ -1122,6 +1124,8 @@ subroutine initial_state()
     n_events = 0
     n_col = 0
     n_ghost = 0
+    n_thermostat = 0
+    n_field = 0
     n_bond = 0
     n_hard = 0
     n_well = 0
@@ -1143,6 +1147,8 @@ subroutine save_state()
         write(saveiounit, *) n_events
         write(saveiounit, *) n_col
         write(saveiounit, *) n_ghost
+        write(saveiounit, *) n_thermostat
+        write(saveiounit, *) n_field
         write(saveiounit, *) n_bond
         write(saveiounit, *) n_hard
         write(saveiounit, *) n_well
@@ -1922,28 +1928,10 @@ subroutine open_files ()
 
     reportfile = trim(simtitle) // trim (simid) // '.csv' ! comma seperated list containing time progression of properties 
     open (unit = reportiounit, file = reportfile, status = 'REPLACE')
-    write(reportiounit, *) ' canonical 2x2 polarized square '
-    write(reportiounit, *) ' '
-    write(reportiounit, *) ' number of cubes , ', cube 
-    write(reportiounit, *) ' number of spheres , ', mols 
-    write(reportiounit, *) ' xa , ', xa 
-    write(reportiounit, *) ' na , ', na
-    write(reportiounit, *) ' area fraction , ', eta 
-    write(reportiounit, *) ' density , ', density 
-    write(reportiounit, *) ' temp set point , ', tempfinal
-    write(reportiounit, *) ' '
-    write(reportiounit, *) ' hard sphere at , ', sigma1 
-    write(reportiounit, *) ' well 1 depth , ', epsilon2
-    write(reportiounit, *) ' well 1 length , ', sigma2
-    write(reportiounit, *) ' well 2 depth , ', epsilon3
-    write(reportiounit, *) ' well 2 length , ', sigma3
-    write(reportiounit, *) ' delta , ', delta
-    write(reportiounit, *) ' '
-    write(reportiounit, *) ' property calc every, '
-    write(reportiounit, *) propfreq, ' steps '
-    write(reportiounit, *) ' '
-    write(reportiounit, *) ' time , events , te , te_fluc , ke , ke_fluc , pot , pot_fluc , temp , ',&
-    'temp_fluc , lm, z , collision rate, ghost , % ghost , col rate, bonds, hards, wells'
+
+    ! report header 
+    write(reportiounit, *) 'time,events,te,te_fluc,ke,ke_fluc,pot,pot_fluc,temp,',&
+    'temp_fluc,lm,z,collision rate,n_ghost,n_thermostat,n_field,colrate,n_bonds,n_hards,n_wells'
 
 
     opfile = trim(simtitle) // trim(simid) // '_op.csv' ! comma seperated list containing time progression of order parameters
@@ -2007,7 +1995,14 @@ subroutine close_files ()
         real(n_bond)/1e6, real(n_bond)*100/real(n_events)
     write(simiounit,'("Number of Ghost Collisions: ", F5.1," million ( ",F5.1," %)")') &
         real(n_ghost)/1e6, real(n_ghost)*100/real(n_events)
-    write(simiounit,'("Ghost Collision Frequency (per second): ", F10.3)') real(n_ghost) / timenow
+    write(simiounit,'("Number of Thermostat Ghost Collisions: ", F5.1," million ( ",F5.1," %)")') &
+        real(n_thermostat)/1e6, real(n_thermostat)*100/real(n_events)
+    write(simiounit,'("Number of Field Ghost Collisions: ", F5.1," million ( ",F5.1," %)")') &
+        real(n_field)/1e6, real(n_field)*100/real(n_events)
+    write(simiounit,'("Thermostat Ghost Collision Frequency (per second): ", F10.3)') &
+        real(n_thermostat) / timenow
+    write(simiounit,'("Field Ghost Collision Frequency (per second): ", F10.3)') &
+        real(n_field) / timenow
     write(simiounit,*) ' ' 
     write(simiounit,'("Number of Cubes:", I7)') cube
     write(simiounit,'("Reduced Area: ", F8.2)') area
@@ -2034,6 +2029,8 @@ subroutine close_files ()
     write(reportiounit, *) ' events , ', n_events
     write(reportiounit, *) ' collisions ,  ', n_col 
     write(reportiounit, *) ' ghosts , ', n_ghost
+    write(reportiounit, *) ' thermo ghosts , ', n_thermostat
+    write(reportiounit, *) ' field ghosts , ', n_field
     write(reportiounit, *) ' bonds , ', n_bond
     write(reportiounit, *) ' hards , ', n_hard
     write(reportiounit, *) ' wells , ', n_well
@@ -2042,7 +2039,8 @@ subroutine close_files ()
     write(reportiounit, *) ' red temperature , ', temp%equilavg / epsilon1
     write(reportiounit, *) ' % error , ', 100 * (tempfinal - (temp%equilavg / epsilon1)) / tempfinal
     write(reportiounit, *) ' '
-    write(reportiounit, *) ' ghost per second , ', (real(n_ghost)) / timenow
+    write(reportiounit, *) ' thermo ghost per second , ', (real(n_thermostat)) / timenow
+    write(reportiounit, *) ' field ghost per second , ', (real(n_field)) / timenow
     write(reportiounit, *) ' '
     write(reportiounit, *) ' red tote per cube , ', (te%equilavg / epsilon1)
     write(reportiounit, *) ' red kene per cube , ', (ke%equilavg / epsilon1)
@@ -2261,7 +2259,7 @@ subroutine report_properties()
         te%sum, pot%sum, ke%sum, temp%sum, lm(1)%sum+lm(2)%sum, nematic%sum
     write(reportiounit, *) timenow, ',', n_events, ',', te%sum, ',', te%sum2, ',', ke%sum,',', &
         ke%sum2, ',', pot%sum, ',', pot%sum2, ',', temp%sum, ',', temp%sum2, ',', (lm(1)%sum+lm(2)%sum), &
-        ',', z%value, ',', n_col, ',', n_ghost, ',', (n_ghost / n_events), ',', (n_col / timenow), ',', &
+        ',', z%value, ',', n_col, ',', n_ghost, ',', n_thermostat, ',',n_field,',',(n_col / timenow), ',', &
         n_bond, ',', n_hard, ',', n_well
     write(opiounit, *) timenow, ',', n_events, ',', h2ts%sum, ',', h2ts%sum2, ',', h2to%sum, ',', h2to%sum2, &
         ',', anti%sum,',', ',', anti%sum2, ',', poly2%sum, ',', poly2%sum2, ',', full%sum, ',', full%sum2, &
@@ -3572,36 +3570,61 @@ end subroutine collide
 
 ! // ghost events //
 
-subroutine ghost_collision(temperature)
+subroutine thermostat_ghost_collision(temperature)
     implicit none
-    ! ** calling variables ***********************************
     real(kind=dbl), intent(in) :: temperature ! system temp 
-    ! ** local variables *************************************
-    real(kind=dbl), parameter :: mu = 0.
-    real(kind=dbl) :: sigma
+    integer :: n ! number of partciles that experience a thermostat ghost collision
+    type(id) :: a ! randomly selected particle that experiences a ghost collisions
+    real(kind=dbl) :: sigma ! standard deviation of gaussian dist.
+    real(kind=dbl) :: mu ! average of gaussian dist.
     real(kind=dbl) :: u1, u2 ! random numbers
-    integer :: i, m, q ! indexing parameter 
+    integer :: i, j, m, q ! indexing parameter 
     type(position), dimension(mer) :: rg ! stores the real position of each particle in ghost coliision
 
-    n_ghost = n_ghost + 1
+    ! determine how many ghost collisions could take place
+    ! the number of particles that experience a ghost collisions
+    ! is determined accoring to a random Poisson variate
+    n = poissondist(real(1., dbl))
+    n_ghost = n_ghost + n
+    n_thermostat = n_thermostat + n
+    if (debug >= 1) write (simiounit, 1) n
+    1 format ('thermostat_ghost_event :: ', I3, ' thermal ghost collisions occur.')
 
+    ! initialize parameters
+    mu = 0. 
     sigma = sqrt(temperature)
-    i = thermostat_event%partner%one
-	do m = 1, mer ! for every sphere in the square formation 
-		do q = 1, ndim
-            ! save the real position of each particle 
-            rg(mer)%r(q) = square(i)%circle(m)%fpos%r(q) + square(i)%circle(m)%vel%v(q) * tsl
-            ! Generate a pseudo random vector components based on a Gaussian distribution along the Box-Mueller algorithm
-            call random_number (u1)
-            call random_number (u2)
-            square(i)%circle(m)%vel%v(q) = mu + (sigma * sqrt( -2. * log(u1)) * sin (twopi * u2))
-            ! update the false position of the particle participating in the ghost event
-            square(i)%circle(m)%fpos%r(q) = rg(mer)%r(q) - square(i)%circle(m)%vel%v(q) * tsl
-		end do 
-        ! apply periodic boundary conditions
-        call apply_periodic_boundaries(square(i)%circle(m)%fpos)
-	end do 
-end subroutine ghost_collision
+
+    if (n > 0) then 
+        ! if the number of particles experiencing ghost collisions is 1 or more
+        do j = 1, n ! repeat process n times
+
+            ! select a random particle
+            a = random_cube()
+            i = a%one
+            if (debug >= 1) write (simiounit, 2) i
+            2 format (' thermostat_ghost_event :: particle ', I5, ' experiences a thermal ghost collision ')
+
+            ! reassign the particles velocity according to a maxwell-boltzmann dist
+        	do m = 1, mer ! for every sphere in the square formation 
+        		do q = 1, ndim
+                    ! save the real position of each particle 
+                    rg(mer)%r(q) = square(i)%circle(m)%fpos%r(q) + square(i)%circle(m)%vel%v(q) * tsl
+                    ! Generate a pseudo random vector components based on a Gaussian distribution along the Box-Mueller algorithm
+                    call random_number (u1)
+                    call random_number (u2)
+                    square(i)%circle(m)%vel%v(q) = mu + (sigma * sqrt( -2. * log(u1)) * sin (twopi * u2))
+                    ! update the false position of the particle participating in the ghost event
+                    square(i)%circle(m)%fpos%r(q) = rg(mer)%r(q) - square(i)%circle(m)%vel%v(q) * tsl
+        		end do 
+                ! apply periodic boundary conditions
+                call apply_periodic_boundaries(square(i)%circle(m)%fpos)
+        	end do 
+
+            ! reschedule the particle's collision events 
+            call ghost_reschedule (i)
+        enddo
+    endif
+end subroutine thermostat_ghost_collision
 
 type(event) function predict_ghost(period)
     implicit none
@@ -3624,6 +3647,40 @@ type(id) function random_cube()
     random_cube%one = ceiling(dummy * real(cube))
     random_cube%two = 0
 end function random_cube
+
+integer function poissondist (lambda)
+    implicit none
+    ! ** purpose *********************************************
+    ! This function generates a random integer based on a 
+    ! Poisson distribution. The poisson variate is generated 
+    ! using an algorithm that simulates a poisson distrubution
+    ! directly.
+    !
+    ! SOURCE: https://hpaulkeeler.com/simulating-poisson-random-variables-direct-method/
+    ! ********************************************************
+
+    ! ** calling variables ***********************************
+    real(kind=dbl), intent(in) :: lambda ! parameter used in poisson PDF
+    ! average number of times and event occurs per unit time
+
+    ! ** local variables *************************************
+    real(kind=dbl) :: exp_lambda
+    real(kind=dbl) :: randUni ! random uniform variable
+    real(kind=dbl) :: prodUni ! product of random uniform variables
+    real(kind=dbl) :: randPoisson ! random poisson variate returned by function
+
+    ! initialize variables
+    exp_lambda = exp(-lambda)
+    randPoisson = -1
+    prodUni = 1
+    do 
+        call random_number(randUni)
+        prodUni = prodUni * randUni
+        randPoisson = randPoisson + 1
+        if (exp_lambda > prodUni) exit
+    end do 
+    poissondist = randPoisson
+end function poissondist
 
 
 ! ** efficiency methods *****************************************
