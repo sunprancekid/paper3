@@ -226,6 +226,10 @@ real(kind=dbl) :: lengthCell ! legnth of each cell in one dimension, must be gre
 !** GLOBAL TYPES: data constructions for OOP
 !*************************************************************
 
+type :: vec 
+    real(kind=dbl), dimension(ndim) :: dim
+end type vec
+
 type :: position 
     real(kind=dbl), dimension(ndim) :: r ! vector describing the position of one sphere
 end type position 
@@ -330,8 +334,9 @@ type(event) :: thermostat_event ! thermostat ghost collision event
 ! ** stochastic external field *******************************
 real(kind=dbl) :: external_field_strength = default_field_stength
 real(kind=dbl) :: external_field_angvel = default_field_angvel
-real(kind=dbl) :: field_force, field_freq, field_period
+real(kind=dbl) :: field_impulse, field_freq, field_period
 type(event) :: field_event ! external field ghost collision event 
+type(vec) :: field_ori ! initial orientation of the field
 ! ** markovian milestoning ***********************************
 logical :: milestone ! boolean that determintes whether milestoning procedure is on or off
 integer :: boundary_index ! index assigned to state of milestone denoting the most recent boundary
@@ -385,6 +390,7 @@ function single_step () result (stop)
         ! field ghost collision event
         write (*,*) "TODO :: implement field ghost collision event."
         call exit(NONZERO_EXITCODE)
+        call field_ghost_collision (field_impulse)
     else ! collision event 
         call collide (a, b, next_event, pv%value)
         call collision_reschedule (a, b)
@@ -870,13 +876,15 @@ subroutine set_external_field (status, strength, freq, force)
     endif
 
     ! initialize external field parameters
-    field_force = sqrt(2. * temperature) ! impulsive force that each charge 
+    field_impulse = sqrt(2. * temperature) ! impulsive force that each charge 
     ! is assigned during a stochastic external field event
     field_freq = (1. * external_field_strength / &
         (1. * sqrt(2. * temperature))) * cube 
     ! frequency that groups experience ghost collisions from the field
     field_period = 1. / field_freq
     ! inevrse of frequency, simulation seconds until next field event
+    field_ori%dim(1) = 0.
+    field_ori%dim(2) = 1.
 
     ! report the status of the external field to the user
     if (field) then 
@@ -3625,6 +3633,74 @@ subroutine thermostat_ghost_collision(temperature)
         enddo
     endif
 end subroutine thermostat_ghost_collision
+
+subroutine field_ghost_collision(impulse)
+    implicit none 
+    real(kind=dbl), intent(in) :: impulse 
+    ! force that particles experience from external field
+    type(vec), dimension(ndim) :: field_vec
+    ! orientation of the external field
+    integer :: n ! number of particles that experience field ghost events
+    type(id) :: a ! particle experiencing event
+    integer :: i ! indexing
+
+
+    ! determine the direction of the field vector
+    if (field_rotation) then 
+        ! TODO :: implement field rotation
+        write (*,*) 'TODO :: IMPLEMENT FIELD ROTATION'
+    else
+        ! the field is not rotating
+        ! field points constantly in the direction of the y-axis
+        field_vec = get_field_vec(field_ori)
+    endif
+
+
+    ! determine n particles
+    n = poissondist(real(2.,dbl))
+    ! increment counter
+    n_ghost = n_ghost + n 
+    n_field = n_field + n 
+    ! report to user
+    if (debug >= 1) write (*, 1) n
+    1 format (" field_ghost_collision :: ",I3," field ghost events.")
+
+    ! if one or more particles have been selected
+    if (n >= 1) then 
+        ! determine the particle that should experience a collision
+        a = random_cube()
+        i = a%one
+
+    endif
+
+end subroutine field_ghost_collision
+
+type(vec) function get_field_vec (ori, angvel, time)
+    implicit none 
+    type(vec), intent(in), optional :: ori
+    ! initial orientiation of the field
+    real(kind=dbl), intent(in), optional :: angvel
+    ! angular velocity of the field.
+    real(kind=dbl), intent(in), optional :: time
+    ! time since the simulation has started
+    type(vec) :: field_ori
+
+    if (present(ori)) then 
+        ! if the orientation of the field was passed to the method
+        ! assign that value as the initial orientation
+        field_ori = ori
+    else
+        ! use the default orientation
+        field_ori%dim(1) = 0.
+        field_ori%dim(2) = 1.
+    endif
+
+    ! if the angular velocity and time were passed to the method
+    if (present(angvel) .and. present(time)) then 
+        get_field_vec%dim(1) = cos((time / angvel) * twopi)
+        get_field_vec%dim(2) = sin((time / angvel) * twopi)
+    endif 
+end function get_field_vec
 
 type(event) function predict_ghost(period)
     implicit none

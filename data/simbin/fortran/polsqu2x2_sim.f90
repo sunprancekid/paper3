@@ -28,21 +28,37 @@ program polarizedsquare_simulation
         call get_command_argument(a,args(a))
     enddo
 
+
+    ! ** MODULE ADJUSTMENTS
     ! TODO :: adjust debugging status so that it can be adjusted from the main program method
+    ! TODO :: adjust output to contain information from state of simulation, independently
+    !     from the simulation order parameters
+    ! ** IO OBJECT?
+    ! TODO :: store key with simulation naming hirearchy, generated or stored with simulation 
+    ! TODO :: add methods for renaming the simulation
 
     ! pass settings to module
     ! load settings
-    ! TO THINK :: better to pass values to function, or set each
-    ! parameter individually (probably the second one -> actually maybe the first? for cleanliness)
+
+    ! actual methods
+    ! TODO :: make sure that milestoning is off! 
     call initialize_simulation_settings(af = 0.2, e = 50000)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1.)
     call set_thermostat (status = .true., temp = 0.3, freq = 0.3)
-    call set_external_field (status = .false., strength = 0.1)
-    ! TODO :: add methods for turning property calculation on and off
-    ! TODO :: add methods for renaming the simulation
 
-    ! TODO :: make sure that milestoning is off! 
+    ! TODO :: assign field direction from main method
+    call set_external_field (status = .false., strength = 0.1)
+
+    ! ** SIMULATION ADJUSTMENTS
+    ! TO THINK :: better to pass values to function, or set each
+    ! parameter individually (probably the second one -> actually maybe the first? for cleanliness)
+    ! TODO :: add methods for turning property calculation on and off
+
+    ! ** VEC OBJ
+    ! TODO :: configure position and vector objects to be children of vector object
+
+
 
     ! load system
     ! system will be initialized if save files are not present
