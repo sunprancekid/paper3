@@ -48,7 +48,7 @@ program polarizedsquare_simulation
     call set_thermostat (status = .true., temp = 0.3, freq = 0.3)
 
     ! TODO :: assign field direction from main method
-    call set_external_field (status = .false., strength = 0.1)
+    call set_external_field (status = .true., strength = 0.1)
 
     ! ** SIMULATION ADJUSTMENTS
     ! TO THINK :: better to pass values to function, or set each

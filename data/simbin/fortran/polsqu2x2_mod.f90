@@ -388,8 +388,8 @@ function single_step () result (stop)
         call addbranch (eventTree, mols+1)
     else if (a%one == (cube + 2)) then 
         ! field ghost collision event
-        write (*,*) "TODO :: implement field ghost collision event."
-        call exit(NONZERO_EXITCODE)
+        ! write (*,*) "TODO :: implement field ghost collision event."
+        ! call exit(NONZERO_EXITCODE)
         call field_ghost_collision (field_impulse)
     else ! collision event 
         call collide (a, b, next_event, pv%value)
@@ -3638,11 +3638,13 @@ subroutine field_ghost_collision(impulse)
     implicit none 
     real(kind=dbl), intent(in) :: impulse 
     ! force that particles experience from external field
-    type(vec), dimension(ndim) :: field_vec
+    type(vec) :: field_vec
     ! orientation of the external field
     integer :: n ! number of particles that experience field ghost events
     type(id) :: a ! particle experiencing event
-    integer :: i ! indexing
+    integer :: i, j, m, q ! indexing
+    real(kind=dbl) :: disp ! displacement of the particles velocity
+    type(position) :: rp ! real position of the particle
 
 
     ! determine the direction of the field vector
@@ -3653,24 +3655,75 @@ subroutine field_ghost_collision(impulse)
         ! the field is not rotating
         ! field points constantly in the direction of the y-axis
         field_vec = get_field_vec(field_ori)
+        ! scale the vector by the magnitude of the interaction
+        field_vec%dim = field_vec%dim * impulse
     endif
 
 
     ! determine n particles
-    n = poissondist(real(2.,dbl))
+    n = poissondist(real(1.,dbl))
     ! increment counter
     n_ghost = n_ghost + n 
     n_field = n_field + n 
     ! report to user
-    if (debug >= 1) write (*, 1) n
+    if (debug >= 1) write (simiounit, 1) n
     1 format (" field_ghost_collision :: ",I3," field ghost events.")
 
     ! if one or more particles have been selected
     if (n >= 1) then 
-        ! determine the particle that should experience a collision
-        a = random_cube()
-        i = a%one
+        ! for each particle
+        do j = 1, n 
+            ! determine the particle that should experience a collision
+            a = random_cube()
+            i = a%one
+            ! report the particle
+            if (debug >= 1) write (simiounit,2) i 
+            2 format(" field_ghost_collision :: ", I3, " was seleceted.")
 
+            ! do the interaction
+            do m = 1, mer 
+                ! for each disc
+                ! if the disc is charged
+                if (square(i)%circle(m)%pol /= 0) then 
+                    ! determine the overall displacement of the particles change in velocity
+                    disp = 0.
+                    ! apply in each dimension
+                    do q = 1, ndim 
+                        ! for each dimension
+                        ! save the real position of the particle
+                        rp%r(q) = square(i)%circle(m)%fpos%r(q) + &
+                            square(i)%circle(m)%vel%v(q) * tsl
+
+                        ! apply an external force to the charged particle
+                        if (square(i)%circle(m)%pol == 1) then 
+                            ! positive particles experience an impulse 
+                            ! in the same direction as the field
+                            square(i)%circle(m)%vel%v(q) = field_vec%dim(q)
+                        else
+                            ! negative particles experience an impulse
+                            ! in the opposite direction as the field
+                            square(i)%circle(m)%vel%v(q) = - field_vec%dim(q)
+                        endif
+
+                        ! update the false position of the particle
+                        square(i)%circle(m)%fpos%r(q) = rp%r(q) - &
+                            square(i)%circle(m)%vel%v(q) * tsl 
+
+                        ! apply periodic boundary conditions
+                        call apply_periodic_boundaries(square(i)%circle(m)%fpos)
+
+                        ! add to the over all displacement of the particle
+                        disp = disp + (square(i)%circle(m)%vel%v(q) * tsl) ** 2
+
+                    enddo
+                    ! determine the overall displacement of the particle
+                    ! update the total displacement if possible
+                    if (sqrt(disp) > nbrDispMax) nbrnow = .true.
+                endif
+            enddo
+        enddo
+        ! reschedule the particles next collision
+        call ghost_reschedule(i)
     endif
 
 end subroutine field_ghost_collision
