@@ -50,35 +50,15 @@ character(len=12), parameter :: green = ' 0 0 1'
 character(len=12), parameter :: orange = ' 1 0 0.64'
 character(len=12), parameter :: purple = ' 1 1 0'
 character(len=15), parameter :: white = ' 0.75 0.75 0.75'
+
+
 ! ** ensemble ************************************************
 integer, parameter :: ndim = 2 ! number of dimensions 
 integer, parameter :: mer = 4 ! number of hardspheres which make one cube
 real(kind=dbl), parameter :: excluded_area = 1. + ((3. / 4.) * pi) ! area occupied by one 2x2 square
 real(kind=dbl), parameter :: tol = 0.001 ! amount by which to allow mistakes from numberical integration (i.e. overlap and bcs)
 integer, parameter :: debug = 0 ! debugging status: 0 == off, 1 == on, 2 == extra on 
-! ** file management *****************************************
-character(len=15), parameter :: simtitle = 'polsqu2x2'
-character(len=20), parameter :: simid = 'test'
-character(len=45), parameter :: fpossavefile = trim(simtitle) // trim(simid) // '__fposSAVE.dat' ! save file containing all false position vectors 
-character(len=45), parameter :: velsavefile = trim(simtitle) // trim(simid) // '__velSAVE.dat' ! save file containing all velocity vectors 
-character(len=45), parameter :: chaisavefile = trim(simtitle) // trim(simid) // '__chaiSAVE.dat' ! save file containing chiraliry description of each grouping
-character(len=45), parameter :: simsavefile = trim(simtitle) // trim(simid) // '__simSAVE.dat' ! save file containing all simulation state 
-character(len=45), parameter :: annealsavefile = trim(simtitle) // trim(simid) // '__annSAVE.dat' ! save file containing the status of the annealing simulation
-character(len=45), parameter :: milestonesavefile = trim(simtitle) // trim(simid) // '__milestoneSAVE.dat' ! save file containing parameters for milestoning
-integer, parameter :: saveiounit = 11 
-integer, parameter :: simiounit = 12
-integer, parameter :: coorsphiounit = 13
-integer, parameter :: coorsquiounit = 14
-integer, parameter :: reportiounit = 15
-integer, parameter :: annealiounit = 16
-integer, parameter :: opiounit = 17
-integer, parameter :: mmiounit = 18
-! ** animation settings *************************************
-integer :: moviesph = 0 ! movie making status of simulation as spheres: 0 == off, 1 == on
-integer :: moviesqu = 1 ! movie making status of simulation as squares: 0 == off, 1 == on
-real(kind=dbl) :: squmovfreq = 200.0 ! frequency to take snapshots of movies [reduced seconds]
-real(kind=dbl) :: sphmovfreq = 200.0 ! frequency to take snapshots of sphere movies
-! TODO :: adjust movie making so that square and sphere movies can happen at different frequencies
+
 
 ! ** SIMULATION SETTINGS *************************************
 ! boolean and default constants for values used to initia-
@@ -219,6 +199,47 @@ real(kind=dbl) :: nbrRadius ! radius of neighborlist
 real(kind=dbl) :: nbrDispMax ! max particle displacement before a neighborlist update is required
 integer :: nCells ! number of cells in one dimension, cell length cannot be shorter than the nerighbor radius
 real(kind=dbl) :: lengthCell ! legnth of each cell in one dimension, must be greater than the square well length (sig2)
+
+
+! ** FILE MANAGEMENT *****************************************
+! parameters for file_io type
+integer, parameter :: max_charlength = 50 ! maximum number of characters for any string
+logical, parameter :: default_status = .true. ! default file writing status if none is provided
+
+
+type file_io
+    logical :: iostatus
+    integer :: iounit
+    character(len=50) :: filename
+end type file_io
+
+character(len=10), parameter :: default_jobid = 'polsqu2x2' ! jobid if none is provided
+character(len=max_charlength) :: jobid ! job id
+character(len=10), parameter :: default_simid = 'test' ! simulation id if none is provided
+character(len=max_charlength) :: simid ! simid
+! files and files names
+character(len=max_charlength) :: fp_savefile ! save file containing all false position vectors 
+character(len=max_charlength) :: v_savefile ! save file containing all velocity vectors 
+character(len=max_charlength) :: c_savefile ! save file containing chiraliry description of each grouping
+character(len=max_charlength) :: sim_savefile ! save file containing all simulation state 
+character(len=max_charlength) :: anneal_savefile ! save file containing the status of the annealing simulation
+character(len=max_charlength) :: ms_savefile ! save file containing parameters for milestoning
+integer :: saveiounit = 11 
+integer :: simiounit = 12
+integer :: coorsphiounit = 13
+integer :: coorsquiounit = 14
+integer :: reportiounit = 15
+integer :: annealiounit = 16
+integer :: opiounit = 17
+integer :: mmiounit = 18
+
+
+! ** animation settings *************************************
+integer :: moviesph = 0 ! movie making status of simulation as spheres: 0 == off, 1 == on
+integer :: moviesqu = 1 ! movie making status of simulation as squares: 0 == off, 1 == on
+real(kind=dbl) :: squmovfreq = 200.0 ! frequency to take snapshots of movies [reduced seconds]
+real(kind=dbl) :: sphmovfreq = 200.0 ! frequency to take snapshots of sphere movies
+! TODO :: adjust movie making so that square and sphere movies can happen at different frequencies
 
 
 
@@ -969,6 +990,23 @@ subroutine initialize_system ()
     ! ** calling variables ***********************************
     ! ** local variables *************************************
 
+    ! open files
+
+    ! character(len=45), parameter :: fp_savefile = trim(simtitle) // trim(simid) // '__fposSAVE.dat' ! save file containing all false position vectors 
+    ! character(len=45), parameter :: v_savefile = trim(simtitle) // trim(simid) // '__velSAVE.dat' ! save file containing all velocity vectors 
+    ! character(len=45), parameter :: c_savefile = trim(simtitle) // trim(simid) // '__chaiSAVE.dat' ! save file containing chiraliry description of each grouping
+    ! character(len=45), parameter :: sim_savefile = trim(simtitle) // trim(simid) // '__simSAVE.dat' ! save file containing all simulation state 
+    ! character(len=45), parameter :: anneal_savefile = trim(simtitle) // trim(simid) // '__annSAVE.dat' ! save file containing the status of the annealing simulation
+    ! character(len=45), parameter :: ms_savefile = trim(simtitle) // trim(simid) // '__milestoneSAVE.dat' ! save file containing parameters for milestoning
+    ! integer, parameter :: saveiounit = 11 
+    ! integer, parameter :: simiounit = 12
+    ! integer, parameter :: coorsphiounit = 13
+    ! integer, parameter :: coorsquiounit = 14
+    ! integer, parameter :: reportiounit = 15
+    ! integer, parameter :: annealiounit = 16
+    ! integer, parameter :: opiounit = 17
+    ! integer, parameter :: mmiounit = 18
+
     ! open simulation files
     call set_annealstatus ()
     if (tempset <= tempfinal) call exit() ! DONE: prevent the system from simulating below the maximum
@@ -1062,7 +1100,7 @@ subroutine set_annealstatus()
     integer :: ierror 
 
     ! load the state of the annealing simulation
-    open (unit = saveiounit, file = trim(annealsavefile), status = 'OLD', action = 'READ', iostat = ierror)
+    open (unit = saveiounit, file = trim(anneal_savefile), status = 'OLD', action = 'READ', iostat = ierror)
     if (ierror == 0) then ! read the information in from the save file 
         read (saveiounit, *) anneal 
         read (saveiounit, *) tempset 
@@ -1080,7 +1118,7 @@ subroutine save_annealstatus()
     integer :: ierror 
 
     ! save the status of the annealing simulation
-    open (unit = saveiounit, file = trim(annealsavefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
+    open (unit = saveiounit, file = trim(anneal_savefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
     if (ierror == 0) then 
         write (saveiounit, *) anneal
         write (saveiounit, *) tempset
@@ -1098,7 +1136,7 @@ subroutine reset_state()
     integer :: ierror 
 
     ! load simulation state
-    open (unit = saveiounit, file = trim(simsavefile), status = 'OLD', action = 'READ', iostat = ierror)
+    open (unit = saveiounit, file = trim(sim_savefile), status = 'OLD', action = 'READ', iostat = ierror)
     if (ierror == 0) then 
         read(saveiounit, *) timenow
         read(saveiounit, *) timeperiod
@@ -1146,7 +1184,7 @@ subroutine save_state()
     integer :: ierror 
 
     ! save the state of the simulation 
-    open (unit = saveiounit, file = trim(simsavefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
+    open (unit = saveiounit, file = trim(sim_savefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
     if (ierror == 0) then 
         write(saveiounit, *) timenow
         write(saveiounit, *) timeperiod
@@ -1179,7 +1217,7 @@ subroutine set_position ()
     integer :: ierror ! used to record the status of i/o operations 
 
     ! if a file containing the simulation postion data exists, read it in
-    open (unit = saveiounit, file = trim(fpossavefile), status = 'OLD', action = 'READ', iostat = ierror)
+    open (unit = saveiounit, file = trim(fp_savefile), status = 'OLD', action = 'READ', iostat = ierror)
     if (ierror == 0) then ! read in the information from the save file 
         write(simiounit,*) 'set_position: postion vectors were read from saveio file'
         read (saveiounit, *) tsl
@@ -1319,7 +1357,7 @@ subroutine save_position()
     integer :: ierror ! used to determine read/write error status 
     integer :: i, m, q ! used for indexing 
 
-    open (unit = saveiounit, file = fpossavefile, status = 'REPLACE', action = 'WRITE', iostat = ierror)
+    open (unit = saveiounit, file = fp_savefile, status = 'REPLACE', action = 'WRITE', iostat = ierror)
 	if (ierror == 0) then 
         write (saveiounit, *) tsl
 		do q = 1 , ndim ! for each dimension 
@@ -1345,7 +1383,7 @@ subroutine set_velocity ()
     integer :: ierror ! used to record the status of i/o operations 
 
     ! if a file containing the simulation velocity data exists, read it in
-    open (unit = saveiounit, file = trim(velsavefile), status = 'OLD', action = 'READ', iostat = ierror)
+    open (unit = saveiounit, file = trim(v_savefile), status = 'OLD', action = 'READ', iostat = ierror)
 	if (ierror == 0) then ! read in the information from the save file 
         write(simiounit,*) 'set_velocity: velocity vectors were read from saveio file'
 		do q = 1 , ndim ! for each dimension 
@@ -1424,7 +1462,7 @@ subroutine save_velocity()
     integer :: ierror ! used to determine read/write error status 
     integer :: i, m, q ! used for indexing 
 
-    open (unit = saveiounit, file = velsavefile, status = 'REPLACE', action = 'WRITE', iostat = ierror)
+    open (unit = saveiounit, file = v_savefile, status = 'REPLACE', action = 'WRITE', iostat = ierror)
 	if (ierror == 0) then 
 		do q = 1 , ndim ! for each dimension 
 			do i = 1, cube ! for each square 
@@ -1451,7 +1489,7 @@ subroutine set_chairality ()
     real :: rand ! random number
 
     ! if a file containing the simulation chirality data exists
-    OPEN (unit = saveiounit, file = trim(chaisavefile), status = 'OLD', action = 'READ', iostat = ierror)
+    OPEN (unit = saveiounit, file = trim(c_savefile), status = 'OLD', action = 'READ', iostat = ierror)
 	if (ierror == 0) then ! read in the information from the save file 
 		do i = 1, cube 
             read (saveiounit, *) square(i)%chai
@@ -1485,7 +1523,7 @@ subroutine save_chairality()
     integer :: ierror ! used to determine read/write error status 
     integer :: i, m ! used for indexing 
 
-    open (unit = saveiounit, file = trim(chaisavefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
+    open (unit = saveiounit, file = trim(c_savefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
 	if (ierror == 0) then 
 		do i = 1, cube ! for each square 
             write (saveiounit, *) square(i)%chai
@@ -1527,7 +1565,7 @@ subroutine set_milestones ()
     !! if the file does not exist or contains a false boolean
     !! then milestoning is turned off
 
-    open(unit = saveiounit, file = trim(milestonesavefile), status = 'OLD', action = 'READ', iostat = ierror)
+    open(unit = saveiounit, file = trim(ms_savefile), status = 'OLD', action = 'READ', iostat = ierror)
     if (ierror == 0) then ! the file exists and was successfully opened
         !!  read in information from the file 
 
@@ -1576,7 +1614,7 @@ subroutine save_milestones ()
     !! if milestoning is on, save the nematic boundaries 
     !! else save the off status
 
-    open(unit = saveiounit, file = trim(milestonesavefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
+    open(unit = saveiounit, file = trim(ms_savefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
     if (ierror == 0) then ! if the file was successfully opened
 
         ! write the boolean determining if milestoning is turned on or off
@@ -1903,7 +1941,7 @@ subroutine open_files ()
 
     write(rp,format) anneal
 
-    simfile = trim(simtitle) // trim(simid) // '.txt'
+    simfile = trim(jobid) // trim(simid) // '.txt'
     open (unit = simiounit, file = trim(simfile), status = 'REPLACE')
     write(simiounit,*) ' '
     write(simiounit,*) '*** Canonical 2x2 Polarized Square Code ***'
@@ -1924,17 +1962,17 @@ subroutine open_files ()
     write(simiounit,*) ' '
 
 
-    coorsphfile = trim(simtitle) // trim(simid) // '_' // 'sphmov.xyz' ! xyz file containing atomic coordinates for ovito animation
+    coorsphfile = trim(jobid) // trim(simid) // '_' // 'sphmov.xyz' ! xyz file containing atomic coordinates for ovito animation
     if (moviesph == 1) open (unit = coorsphiounit, file = trim(coorsphfile), status = 'REPLACE')
 
-    coorsqufile = trim(simtitle) // trim(simid) // '_' // 'squmov.xyz' ! xyz file containing atomic coordinates for ovito animation
+    coorsqufile = trim(jobid) // trim(simid) // '_' // 'squmov.xyz' ! xyz file containing atomic coordinates for ovito animation
     if (moviesqu == 1) open (unit = coorsquiounit, file = trim(coorsqufile), status = 'REPLACE')
 
-    annealfile = trim(simtitle) // trim(simid) // '_anneal.csv' ! comma seperated list containing a summary of annealing simulations
+    annealfile = trim(jobid) // trim(simid) // '_anneal.csv' ! comma seperated list containing a summary of annealing simulations
     open (unit = annealiounit, file = trim(annealfile), status = 'REPLACE', iostat = ioerror)
     write(annealiounit,*) 'id, time, set, temp, te, te_fluc, pot, pot_fluc, ke, ke_fluc, nematic, nem_fluc'
 
-    reportfile = trim(simtitle) // trim (simid) // '.csv' ! comma seperated list containing time progression of properties 
+    reportfile = trim(jobid) // trim (simid) // '.csv' ! comma seperated list containing time progression of properties 
     open (unit = reportiounit, file = reportfile, status = 'REPLACE')
 
     ! report header 
@@ -1942,7 +1980,7 @@ subroutine open_files ()
     'temp_fluc,lm,z,collision rate,n_ghost,n_thermostat,n_field,colrate,n_bonds,n_hards,n_wells'
 
 
-    opfile = trim(simtitle) // trim(simid) // '_op.csv' ! comma seperated list containing time progression of order parameters
+    opfile = trim(jobid) // trim(simid) // '_op.csv' ! comma seperated list containing time progression of order parameters
     open(unit = opiounit, file = trim(opfile), status = 'REPLACE')
     write(opiounit, *) 'time, events, h2ts, h2ts_fluc, h2to, h2to_fluc, anti, anti_fluc,', &
         ' poly2, poly2_fluc, full, full_fluc, fulls, fulls_fluc, ,fullo, ', &
@@ -1950,7 +1988,7 @@ subroutine open_files ()
         ' poly1bb, poly1bb_fluc, poly1, poly1_fluc, percolation, nclust,',&
         ' nclust_fluc, nematic, nematic_fluc'
 
-    mmfile = trim(simtitle) // trim(simid) // '_mm.csv'
+    mmfile = trim(jobid) // trim(simid) // '_mm.csv'
     open (unit = mmiounit, file = trim(mmfile), status = 'REPLACE')
     write (mmiounit, *) 'boundary index, upper boundary, lower boundary, n_ul, n_uu, n_lu,', &
         ' n_ll, t_u, t_l'
