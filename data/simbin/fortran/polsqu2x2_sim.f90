@@ -42,13 +42,13 @@ program polarizedsquare_simulation
 
     ! actual methods
     ! TODO :: make sure that milestoning is off! 
-    call initialize_simulation_settings(af = 0.2, e = 50000)
+    call initialize_simulation_settings(af = 0.1, e = 50000000, nc = 16)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1.)
-    call set_thermostat (status = .true., temp = 0.3, freq = 0.3)
+    call set_thermostat (status = .true., temp = 0.2, freq = 0.05)
 
     ! TODO :: assign field direction from main method
-    call set_external_field (status = .true., strength = 0.1)
+    call set_external_field (status = .true., strength = 0.5)
 
     ! ** SIMULATION ADJUSTMENTS
     ! TO THINK :: better to pass values to function, or set each

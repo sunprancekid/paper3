@@ -55,7 +55,7 @@ integer, parameter :: ndim = 2 ! number of dimensions
 integer, parameter :: mer = 4 ! number of hardspheres which make one cube
 real(kind=dbl), parameter :: excluded_area = 1. + ((3. / 4.) * pi) ! area occupied by one 2x2 square
 real(kind=dbl), parameter :: tol = 0.001 ! amount by which to allow mistakes from numberical integration (i.e. overlap and bcs)
-integer, parameter :: debug = 1 ! debugging status: 0 == off, 1 == on, 2 == extra on 
+integer, parameter :: debug = 0 ! debugging status: 0 == off, 1 == on, 2 == extra on 
 ! ** file management *****************************************
 character(len=15), parameter :: simtitle = 'polsqu2x2'
 character(len=20), parameter :: simid = 'test'
@@ -227,7 +227,7 @@ real(kind=dbl) :: lengthCell ! legnth of each cell in one dimension, must be gre
 !*************************************************************
 
 type :: vec 
-    real(kind=dbl), dimension(ndim) :: dim
+    real(kind=dbl), dimension(ndim) :: d ! dimension of the field
 end type vec
 
 type :: position 
@@ -388,9 +388,9 @@ function single_step () result (stop)
         call addbranch (eventTree, mols+1)
     else if (a%one == (cube + 2)) then 
         ! field ghost collision event
-        ! write (*,*) "TODO :: implement field ghost collision event."
-        ! call exit(NONZERO_EXITCODE)
         call field_ghost_collision (field_impulse)
+        field_event = predict_ghost(field_period)
+        call addbranch (eventTree, mols+2)
     else ! collision event 
         call collide (a, b, next_event, pv%value)
         call collision_reschedule (a, b)
@@ -405,22 +405,22 @@ function single_step () result (stop)
         if (check_boundaries()) call restart ()
     end if 
 
-    ! markovian milestoning check
-    if (mod(n_events, milestonecheck_freq) == 0) then 
-        ! determine if simulation has reach any of the cell boundaries
-        if (check_milestoning_boundaries ()) then 
+    ! ! markovian milestoning check
+    ! if (mod(n_events, milestonecheck_freq) == 0) then 
+    !     ! determine if simulation has reach any of the cell boundaries
+    !     if (check_milestoning_boundaries ()) then 
 
-            ! apply the procedure for reversing a collision with a cell boundary
-            call milestone_boundary_collision() 
-            call close_files()
-            call exit()
-        endif
+    !         ! apply the procedure for reversing a collision with a cell boundary
+    !         call milestone_boundary_collision() 
+    !         call close_files()
+    !         call exit()
+    !     endif
 
-        ! if the simulation hasn't reached a bonudary
-        ! save the state of the simulation and continue 
-        call save()
+    !     ! if the simulation hasn't reached a bonudary
+    !     ! save the state of the simulation and continue 
+    !     call save()
 
-    end if
+    ! end if
 
     ! property calculations
     if (mod(n_events, propfreq) == 0) then 
@@ -883,8 +883,8 @@ subroutine set_external_field (status, strength, freq, force)
     ! frequency that groups experience ghost collisions from the field
     field_period = 1. / field_freq
     ! inevrse of frequency, simulation seconds until next field event
-    field_ori%dim(1) = 0.
-    field_ori%dim(2) = 1.
+    field_ori%d(1) = 0.
+    field_ori%d(2) = 1.
 
     ! report the status of the external field to the user
     if (field) then 
@@ -3587,6 +3587,7 @@ subroutine thermostat_ghost_collision(temperature)
     real(kind=dbl) :: mu ! average of gaussian dist.
     real(kind=dbl) :: u1, u2 ! random numbers
     integer :: i, j, m, q ! indexing parameter 
+    real(kind=dbl) :: disp ! used to measure particle displacement since tsl
     type(position), dimension(mer) :: rg ! stores the real position of each particle in ghost coliision
 
     ! determine how many ghost collisions could take place
@@ -3614,6 +3615,7 @@ subroutine thermostat_ghost_collision(temperature)
 
             ! reassign the particles velocity according to a maxwell-boltzmann dist
         	do m = 1, mer ! for every sphere in the square formation 
+                disp = 0.
         		do q = 1, ndim
                     ! save the real position of each particle 
                     rg(mer)%r(q) = square(i)%circle(m)%fpos%r(q) + square(i)%circle(m)%vel%v(q) * tsl
@@ -3623,7 +3625,11 @@ subroutine thermostat_ghost_collision(temperature)
                     square(i)%circle(m)%vel%v(q) = mu + (sigma * sqrt( -2. * log(u1)) * sin (twopi * u2))
                     ! update the false position of the particle participating in the ghost event
                     square(i)%circle(m)%fpos%r(q) = rg(mer)%r(q) - square(i)%circle(m)%vel%v(q) * tsl
+                    ! accumulate displacement
+                    disp = disp + (square(i)%circle(m)%vel%v(q) ** 2)
         		end do 
+                ! determine if maximum displacement was reached
+                if (sqrt(disp) > nbrDispMax) nbrnow = .true.
                 ! apply periodic boundary conditions
                 call apply_periodic_boundaries(square(i)%circle(m)%fpos)
         	end do 
@@ -3654,9 +3660,9 @@ subroutine field_ghost_collision(impulse)
     else
         ! the field is not rotating
         ! field points constantly in the direction of the y-axis
-        field_vec = get_field_vec(field_ori)
+        field_vec = get_field_vec()
         ! scale the vector by the magnitude of the interaction
-        field_vec%dim = field_vec%dim * impulse
+        field_vec%d = field_vec%d * impulse
     endif
 
 
@@ -3678,13 +3684,13 @@ subroutine field_ghost_collision(impulse)
             i = a%one
             ! report the particle
             if (debug >= 1) write (simiounit,2) i 
-            2 format(" field_ghost_collision :: ", I3, " was seleceted.")
+            2 format(" field_ghost_collision :: ", I3, " was selected.")
 
             ! do the interaction
             do m = 1, mer 
                 ! for each disc
-                ! if the disc is charged
                 if (square(i)%circle(m)%pol /= 0) then 
+                    ! if the disc is charged
                     ! determine the overall displacement of the particles change in velocity
                     disp = 0.
                     ! apply in each dimension
@@ -3698,19 +3704,16 @@ subroutine field_ghost_collision(impulse)
                         if (square(i)%circle(m)%pol == 1) then 
                             ! positive particles experience an impulse 
                             ! in the same direction as the field
-                            square(i)%circle(m)%vel%v(q) = field_vec%dim(q)
+                            square(i)%circle(m)%vel%v(q) = field_vec%d(q)
                         else
                             ! negative particles experience an impulse
                             ! in the opposite direction as the field
-                            square(i)%circle(m)%vel%v(q) = - field_vec%dim(q)
+                            square(i)%circle(m)%vel%v(q) = - field_vec%d(q)
                         endif
 
                         ! update the false position of the particle
                         square(i)%circle(m)%fpos%r(q) = rp%r(q) - &
                             square(i)%circle(m)%vel%v(q) * tsl 
-
-                        ! apply periodic boundary conditions
-                        call apply_periodic_boundaries(square(i)%circle(m)%fpos)
 
                         ! add to the over all displacement of the particle
                         disp = disp + (square(i)%circle(m)%vel%v(q) * tsl) ** 2
@@ -3719,13 +3722,15 @@ subroutine field_ghost_collision(impulse)
                     ! determine the overall displacement of the particle
                     ! update the total displacement if possible
                     if (sqrt(disp) > nbrDispMax) nbrnow = .true.
+
+                    ! apply periodic boundary conditions
+                    call apply_periodic_boundaries(square(i)%circle(m)%fpos)
                 endif
             enddo
+            ! reschedule the particles next collision
+            call ghost_reschedule(i)
         enddo
-        ! reschedule the particles next collision
-        call ghost_reschedule(i)
     endif
-
 end subroutine field_ghost_collision
 
 type(vec) function get_field_vec (ori, angvel, time)
@@ -3741,17 +3746,17 @@ type(vec) function get_field_vec (ori, angvel, time)
     if (present(ori)) then 
         ! if the orientation of the field was passed to the method
         ! assign that value as the initial orientation
-        field_ori = ori
+        get_field_vec = ori
     else
         ! use the default orientation
-        field_ori%dim(1) = 0.
-        field_ori%dim(2) = 1.
+        get_field_vec%d(1) = 0.0
+        get_field_vec%d(2) = 1.0
     endif
 
     ! if the angular velocity and time were passed to the method
     if (present(angvel) .and. present(time)) then 
-        get_field_vec%dim(1) = cos((time / angvel) * twopi)
-        get_field_vec%dim(2) = sin((time / angvel) * twopi)
+        get_field_vec%d(1) = cos((time / angvel) * twopi)
+        get_field_vec%d(2) = sin((time / angvel) * twopi)
     endif 
 end function get_field_vec
 
