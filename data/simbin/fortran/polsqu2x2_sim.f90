@@ -42,10 +42,10 @@ program polarizedsquare_simulation
 
     ! actual methods
     ! TODO :: make sure that milestoning is off! 
-    call initialize_simulation_settings(af = 0.1, e = 50000000, nc = 16)
+    call initialize_simulation_settings(af = 0.2, e = 10000000, nc = 16, ac = 0.8)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1.)
-    call set_thermostat (status = .true., temp = 0.2, freq = 0.05)
+    call set_thermostat (status = .true., temp = 0.11, freq = 0.1)
 
     ! TODO :: assign field direction from main method
     call set_external_field (status = .true., strength = 0.5)
@@ -63,6 +63,8 @@ program polarizedsquare_simulation
     ! load system
     ! system will be initialized if save files are not present
     call initialize_system()
+    ! TODO :: turn on annealing, or milestoning 
+    !   (i.e. read in those files, overwrite relevant settings)
 
     ! run the simulation if the parameters are met
     if (trim(args(1)) == '1') then

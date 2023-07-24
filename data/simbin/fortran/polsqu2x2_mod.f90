@@ -205,14 +205,20 @@ real(kind=dbl) :: lengthCell ! legnth of each cell in one dimension, must be gre
 ! parameters for file_io type
 integer, parameter :: max_charlength = 50 ! maximum number of characters for any string
 logical, parameter :: default_status = .true. ! default file writing status if none is provided
-
+integer, parameter :: init_iounit = 10 ! first io unit used in creating files
+integer :: curr_iounit = init_iounit ! iounit assign to next file that is created
 
 type file_io
     logical :: iostatus
     integer :: iounit
-    character(len=50) :: filename
+    character(len=max_charlength) :: filename
 end type file_io
 
+type(file_io) :: fp_io ! file io for false position
+type(file_io) :: vel_io ! file io for velocity
+! type(file_io) :: c_i
+
+! TODO :: initialize file names and units
 character(len=10), parameter :: default_jobid = 'polsqu2x2' ! jobid if none is provided
 character(len=max_charlength) :: jobid ! job id
 character(len=10), parameter :: default_simid = 'test' ! simulation id if none is provided
@@ -856,7 +862,7 @@ subroutine set_thermostat (status, temp, freq)
     endif
 end subroutine set_thermostat
 
-subroutine set_external_field (status, strength, freq, force) 
+subroutine set_external_field (status, strength, freq, force, ori) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if external field should be turned on or off
@@ -867,6 +873,29 @@ subroutine set_external_field (status, strength, freq, force)
     real, intent(in), optional :: force 
     ! strength of impulsive force that charged particles experience during 
     ! an external field ghost collision
+    type(vec), intent(in), optional :: ori ! field orientation
+    logical :: check_ori ! used for determining if the orientation is correct
+    real(kind=dbl) :: norm ! used to normalize the field orientation 
+    integer :: q ! used for indexing
+
+    ! formatting statements
+    1 format (" set_external_field :: Field impulse has been set to value passed to method (", &
+        F5.3, ").")
+    2 format (" set_external_field :: Field impulse set to default value proportional ", & 
+        "to the system temperature (", F5.3,").")
+    3 format(" set_external_field :: unable to assign external field strength. ", &
+        "value passed to method (", F5.3,") is less than zero.")
+    4 format (" set_external_field :: external field strength set to ", F5.3,".")
+    5 format (" set_external_field :: unable to assign the field frequency value ", &
+        "passed to the method. value (", F8.3,") is less than zero.")
+    6 format(" set_external_field :: external ghost collision field frequency set to ", &
+        F8.3, " per simulation second.")
+    7 format(" set_external_field :: unable to assign the field orientation passed to ", &
+        "method. Both values (", F5.3,", ", F5.3,") equal to zero.")
+    8 format(" set_external_field :: field orientation set to (", F5.3,", ", F5.3,").")
+    9 format(" set_external_field :: field is set to (impulse = ", F5.3", freq = ", F8.3, &
+        "), which corresponds to a strength of (", F5.3,"), in the direction (", F5.3, &
+        ",", F5.3,").")
 
     if (present(status)) then 
         if (status) then 
@@ -880,39 +909,142 @@ subroutine set_external_field (status, strength, freq, force)
         endif 
     endif
 
-    if (present(strength)) then 
-        ! check that the value is greater than zero
-        if (strength < 0) then 
-            ! value is less than zero
-            1 format(" set_external_field :: unable to assign external field strength. ", &
-                "value passed to method (", F5.3,") is less than zero.")
-            write (*,1) strength 
+    ! if the field is on
+    if (status) then 
+
+        ! assign the field impulse 
+        if (present(force)) then 
+            ! check that the value passed to the method is acceptable
+            if (force > 0.) then 
+                ! if force has been assigned and an allowable value
+                ! set the field impulse to the value passed to the method
+                field_impulse = force 
+                ! inform the user
+                write (*, 1) field_impulse
+            else
+                ! assign the default
+                field_impulse = sqrt(2. * temperature)
+                ! inform the user
+                write (*, 2) field_impulse
+            endif
         else
-            ! external field strength value is greater than zero 
-            external_field_strength = strength
-            2 format (" set_external_field :: external field ghost collision frequency set to ", &
-                F5.3," per simulation second.")
-            write (*,2) external_field_strength
+            ! force not assigned or value passed to method not allowable
+            ! assign the default 
+            field_impulse = sqrt(2. * temperature)
+            write (*, 2) field_impulse
+        endif 
+
+        ! assign field strength or frequency
+        ! cannot assign both
+        if (present(strength) .and. (present(freq))) then 
+            ! if both have been assigned, throw an error
+            write (*,*) "set_external_field :: Error. Unable to assign both field strength ",&
+                "and field frequency. Quitting program."
+            call exit()
+
+        else if (present(strength)) then 
+
+            ! if only the field strength has been passed to the method
+            ! check that the value is greater than zero
+            if (strength < 0.) then 
+
+                ! value is less than zero
+                ! inform the user that the value cannot be assigned
+                write (*,3) strength 
+
+                ! assign defaults
+                external_field_strength = default_field_stength
+            else
+                ! external field strength value is greater than zero 
+                ! assign the value and inform the user
+                external_field_strength = strength
+            endif
+
+
+            ! assign the field frequency according to the external field strength
+            field_freq = (1. * external_field_strength / &
+                (1. * field_impulse)) * real(cube)
+            field_period = 1. / field_freq
+
+            ! inform the user the values of the external field strength
+            ! and the field frequency
+            write (*,4) external_field_strength
+            write (*,6) field_freq
+
+        else if (present(freq)) then 
+            ! if only the field frequency has been passed to the method
+
+            ! check that the value is allowable
+            if (freq > 0.) then 
+                ! assign the value and report to the user
+                field_freq = freq
+                field_period = 1. / field_freq
+
+                ! the external field strength is back calculated
+                external_field_strength = field_freq * field_impulse * real(cube)
+            else 
+                ! inform the user that the value passed to the method
+                ! cannot be assigned
+                write (*,5) freq
+
+                ! assign the default external field strength, field freq
+                external_field_strength = default_field_stength
+                field_freq = (1. * external_field_strength / &
+                    (1. * field_impulse)) * real(cube)
+                field_period = 1. / field_freq
+
+            endif
+
+            ! inform the user the value of the field frequency and strength
+            write (*,6) field_freq
+            write (*,4) external_field_strength
+        else 
+            ! if neither have been assigned, assign the defaults
+            external_field_strength = default_field_stength
+            field_freq = (1. * external_field_strength / &
+                (1. * field_impulse)) * real(cube)
+            field_period = 1. / field_freq
+            ! inform the user the value of the field frequency and strength
+            write (*,6) field_freq
+            write (*,4) external_field_strength
+        endif
+
+        if (present(ori)) then 
+            ! check that the values passed to the method are acceptable
+            ! both values cannot be equal to zero
+            if ((abs(ori%d(1)) < tol) .and. (abs(ori%d(2)) < tol)) then 
+                ! inform the user that the values passed to the method
+                ! do not meet the constrains
+                write (*,7) ori%d(1), ori%d(2)
+
+                ! assign the defaults
+                field_ori%d(1) = 0.
+                field_ori%d(2) = 1.
+            else
+                ! the orientation passed to the method is acceptable
+                ! assign the normalized orientation
+                norm = sqrt(ori%d(1) ** 2 + ori%d(2) ** 2)
+                do q = 1, ndim
+                    field_ori%d(q) = ori%d(q) / norm
+                enddo
+            endif 
+
+            ! inform the user
+            write (*,8) field_ori%d(1), field_ori%d(2)
+        else
+            ! assign defaults and inform user
+            field_ori%d(1) = 0.
+            field_ori%d(2) = 1.
+            ! inform the user
+            write (*,8) field_ori%d(1), field_ori%d(2)
         endif
     endif
-
-    ! initialize external field parameters
-    field_impulse = sqrt(2. * temperature) ! impulsive force that each charge 
-    ! is assigned during a stochastic external field event
-    field_freq = (1. * external_field_strength / &
-        (1. * sqrt(2. * temperature))) * cube 
-    ! frequency that groups experience ghost collisions from the field
-    field_period = 1. / field_freq
-    ! inevrse of frequency, simulation seconds until next field event
-    field_ori%d(1) = 0.
-    field_ori%d(2) = 1.
 
     ! report the status of the external field to the user
     if (field) then 
         ! external field is on
-        3 format (" set_external_field :: external field is on and external field strength is set to ", &
-        F5.3, " per simulation second." )
-        write (*,3) external_field_strength
+        write (*,9) field_impulse, field_freq, external_field_strength, &
+            field_ori%d(1), field_ori%d(2)
     else
         ! external field is off
         write (*,*) "set_external_field :: external field is off."
@@ -985,32 +1117,56 @@ end function sooner
 
 ! ** initialization / restarting / saving / loading ***********
 
-subroutine initialize_system ()
+subroutine initialize_system (job, sim)
     implicit none 
-    ! ** calling variables ***********************************
-    ! ** local variables *************************************
+    character(len=*), intent(in), optional :: job ! job id of simulation
+    character(len=*), intent(in), optional :: sim ! sim id of simulation
 
-    ! open files
+    ! assign job and simulation id, if they are present
+    if (present(job)) then
+        ! check the length, assign
+        if (len_trim(job) <= max_charlength) then 
+            ! if the length is less than the max character length
+            ! assign the job
+            jobid = trim(job)
+        else
+            ! if the string is too long 
+            ! inform the user and assign the default
+            write (*,*) "initialize_system :: unable to assign jobid passed to method. Too many characters in string."
+            jobid = trim(default_jobid)
+        endif
+    else
+        ! assign default
+        jobid = trim(default_jobid)
+    endif
+    1 format(" initialize_system :: simulation jobid set to ", A,'.')
+    write (*,1) trim(jobid)
 
-    ! character(len=45), parameter :: fp_savefile = trim(simtitle) // trim(simid) // '__fposSAVE.dat' ! save file containing all false position vectors 
-    ! character(len=45), parameter :: v_savefile = trim(simtitle) // trim(simid) // '__velSAVE.dat' ! save file containing all velocity vectors 
-    ! character(len=45), parameter :: c_savefile = trim(simtitle) // trim(simid) // '__chaiSAVE.dat' ! save file containing chiraliry description of each grouping
-    ! character(len=45), parameter :: sim_savefile = trim(simtitle) // trim(simid) // '__simSAVE.dat' ! save file containing all simulation state 
-    ! character(len=45), parameter :: anneal_savefile = trim(simtitle) // trim(simid) // '__annSAVE.dat' ! save file containing the status of the annealing simulation
-    ! character(len=45), parameter :: ms_savefile = trim(simtitle) // trim(simid) // '__milestoneSAVE.dat' ! save file containing parameters for milestoning
-    ! integer, parameter :: saveiounit = 11 
-    ! integer, parameter :: simiounit = 12
-    ! integer, parameter :: coorsphiounit = 13
-    ! integer, parameter :: coorsquiounit = 14
-    ! integer, parameter :: reportiounit = 15
-    ! integer, parameter :: annealiounit = 16
-    ! integer, parameter :: opiounit = 17
-    ! integer, parameter :: mmiounit = 18
+    if (present(sim)) then 
+        ! check length, assign
+        if (len_trim(sim) <= max_charlength) then 
+            ! if the length of the string is less than the max length
+            ! assign to simulation id
+            simid = trim(sim)
+        else
+            ! the string is too long 
+            ! inform the user and assign the default
+            write (*,*) "initialize_system :: unable to assign simid passed to method. too many characters in string."
+            simid = trim(default_simid)
+        endif
+    else
+        ! assign default)
+        simid = trim(default_simid)
+    endif
+    2 format(" initialize_system :: simulation simid set to ", A, ".")
+    write (*,2) trim(simid)
 
     ! open simulation files
+    call open_files ()
     call set_annealstatus ()
     if (tempset <= tempfinal) call exit() ! DONE: prevent the system from simulating below the maximum
-    call open_files ()
+    ! TODO :: write headers method
+    ! TODO :: if annealing AND anneal status is met, quit simulation
 
     ! allocate arrays
     allocate(square(cube))
@@ -1019,7 +1175,8 @@ subroutine initialize_system ()
     ! ghost event
 
     ! initialize groupings
-    call reset_state ()
+    ! call reset_state ()
+    call initial_state()
     call set_position ()
     call set_velocity ()
     call set_chairality ()
@@ -1929,6 +2086,32 @@ end function periodicbounderiesoverlap
 
 ! ** file i/o *************************************************
 
+type(file_io) function set_file_io (status, unit, name)
+    logical, intent(in), optional :: status 
+    ! boolean that determines if the file should be written to
+    integer, intent(in) :: unit 
+    ! iounit assigned to writing for that file
+    character(len=max_charlength), intent(in) :: name 
+    ! name assigned to file for writing / reading
+    
+    ! use parameters passed to method to initialize the file_io object
+    ! initialize iostatus
+    if (present(status)) then 
+        ! assign the value passed to the method
+        set_file_io%iostatus = status 
+    else
+        ! if no status was passed to the method
+        ! assume true 
+        set_file_io%iostatus = .true. 
+    endif
+
+    ! initialize iounit 
+    set_file_io%iounit = unit 
+
+    ! initialize file name 
+    set_file_io%filename = trim(name)
+end function set_file_io
+
 subroutine open_files ()
     implicit none 
     ! ** calling variables ***********************************
@@ -1938,6 +2121,46 @@ subroutine open_files ()
     character(len=45) :: simfile, coorsphfile, coorsqufile, reportfile, &
         annealfile, opfile, mmfile
     integer :: ioerror
+
+    ! initialize first iounit, use for counting
+    curr_iounit = init_iounit
+
+    ! name files, assign iounits
+    ! save file names
+    ! save file containing all false position vectors 
+    fp_savefile = trim(jobid) // trim(simid) // '__fposSAVE.dat' 
+    ! fp_io = set_file_io (status = .true., unit = curr_iounit, &
+    !     name = trim(fp_savefile))
+    ! curr_iounit = curr_iounit + 1
+    ! ! save file containing all velocity vectors 
+    v_savefile = trim(jobid) // trim(simid) // '__velSAVE.dat' 
+    ! vel_io = set_file_io (status = .true., unit = curr_iounit, &
+    !     name = trim(v_savefile))
+    ! curr_iounit = curr_iounit + 1 
+
+    ! TODO :: continue filename / initialization
+    ! TODO :: decide on save file variable names
+    ! TODO :: add reading / writing status to file_io (private variables),
+    !   add methods for opening / closing file readers / writers
+
+    c_savefile = trim(jobid) // trim(simid) // '__chaiSAVE.dat' 
+    ! save file containing chiraliry description of each grouping
+    sim_savefile = trim(jobid) // trim(simid) // '__simSAVE.dat' 
+    ! save file containing all simulation state 
+    anneal_savefile = trim(jobid) // trim(simid) // '__annSAVE.dat' 
+    ! save file containing the status of the annealing simulation
+    ms_savefile = trim(jobid) // trim(simid) // '__milestoneSAVE.dat' 
+    ! save file containing parameters for milestoning
+
+
+    ! integer, parameter :: saveiounit = 11 
+    ! integer, parameter :: simiounit = 12
+    ! integer, parameter :: coorsphiounit = 13
+    ! integer, parameter :: coorsquiounit = 14
+    ! integer, parameter :: reportiounit = 15
+    ! integer, parameter :: annealiounit = 16
+    ! integer, parameter :: opiounit = 17
+    ! integer, parameter :: mmiounit = 18
 
     write(rp,format) anneal
 

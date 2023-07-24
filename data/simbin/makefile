@@ -46,6 +46,14 @@ polsqu_run: clean
 	$(FORT) -o polsqu_test.ex $(POLSQU_SIM).o $(POLSQU_MOD).o
 	./polsqu_test.ex 1
 
+polsqu_anneal:
+	# compile module, simulation program with out cleaning previous files
+	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(POLSQU_SIM).f90
+	# link module and program
+	$(FORT) -o polsqu_test.ex $(POLSQU_SIM).o $(POLSQU_MOD).o
+	./polsqu_test.ex 1
+
+
 # rod3_test: clean
 # 	$(FORT) $(DEBUG) $(FORTBIN)/$(ROD3_FILE)
 # 	./a.out
