@@ -885,7 +885,7 @@ subroutine set_external_field (status, strength, freq, force, ori)
         "to the system temperature (", F5.3,").")
     3 format(" set_external_field :: unable to assign external field strength. ", &
         "value passed to method (", F5.3,") is less than zero.")
-    4 format (" set_external_field :: external field strength set to ", F5.3,".")
+    4 format (" set_external_field :: external field strength set to ", F8.3,".")
     5 format (" set_external_field :: unable to assign the field frequency value ", &
         "passed to the method. value (", F8.3,") is less than zero.")
     6 format(" set_external_field :: external ghost collision field frequency set to ", &
@@ -894,7 +894,7 @@ subroutine set_external_field (status, strength, freq, force, ori)
         "method. Both values (", F5.3,", ", F5.3,") equal to zero.")
     8 format(" set_external_field :: field orientation set to (", F5.3,", ", F5.3,").")
     9 format(" set_external_field :: field is set to (impulse = ", F5.3", freq = ", F8.3, &
-        "), which corresponds to a strength of (", F5.3,"), in the direction (", F5.3, &
+        "), which corresponds to a strength of (", F8.3,"), in the direction (", F5.3, &
         ",", F5.3,").")
 
     if (present(status)) then 

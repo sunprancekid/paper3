@@ -8,7 +8,7 @@
 program testH
     use polarizedsquaremodule
     implicit none
-    integer, parameter :: N_ARGS = 1 ! number of arguments accepted by simulation file
+    integer, parameter :: N_ARGS = 4 ! number of arguments accepted by simulation file
     integer :: a  ! number of arguments determined by program
     character(len=12), dimension(:), allocatable :: args
     real :: tset, vmag, ffrq
@@ -34,6 +34,7 @@ program testH
     read (args(1), '(f6.4)') tset
     read (args(2), '(f6.4)') vmag
     read (args(3), '(f6.0)') ffrq
+    ! the fourth value passed to the method is simid for the testH job
 
     ! initialize simulation
     call initialize_simulation_settings(af = 0.2, e = 10000000, nc = 16, ac = 0.8)
@@ -43,14 +44,12 @@ program testH
     call set_external_field (status = .true., freq = ffrq, force = vmag)
 
     ! initialize system
-    call initialize_system()
+    call initialize_system(job = "testH", sim = trim(args(4)))
 
     ! run the simulation if the parameters are met
-    if (trim(args(1)) == '1') then
-        do
-            if (single_step()) exit
-        enddo
-    endif 
+    do
+        if (single_step()) exit
+    enddo
 end program testH
 
 

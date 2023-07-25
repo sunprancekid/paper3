@@ -42,7 +42,7 @@ program polarizedsquare_simulation
 
     ! actual methods
     ! TODO :: make sure that milestoning is off! 
-    call initialize_simulation_settings(af = 0.2, e = 10000000, nc = 16, ac = 0.8)
+    call initialize_simulation_settings(af = 0.2, e = 1000000, nc = 16, ac = 0.8)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1.)
     call set_thermostat (status = .true., temp = 0.11, freq = 0.1)
