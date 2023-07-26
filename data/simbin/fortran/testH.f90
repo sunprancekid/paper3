@@ -8,10 +8,13 @@
 program testH
     use polarizedsquaremodule
     implicit none
-    integer, parameter :: N_ARGS = 4 ! number of arguments accepted by simulation file
+    integer, parameter :: N_ARGS = 7 ! number of arguments accepted by simulation file
     integer :: a  ! number of arguments determined by program
     character(len=12), dimension(:), allocatable :: args
-    real :: tset, vmag, ffrq
+    real :: area_frac ! simulation area fraction
+    integer :: events ! length of simulation
+    integer :: cell_size ! simulation cell size
+    real :: tset, vmag, ffrq ! testH parameters
 
     ! parse the number of arguments passed to the program
     a = command_argument_count()
@@ -31,20 +34,23 @@ program testH
     enddo
 
     ! read argument values
-    read (args(1), '(f6.4)') tset
-    read (args(2), '(f6.4)') vmag
-    read (args(3), '(f6.0)') ffrq
-    ! the fourth value passed to the method is simid for the testH job
+    read (args(1), '(f6.4)') area_frac ! first argument is the simulation area fraction
+    read (args(2), *) events ! second argument is the number of simulation events
+    read (args(3), *) cell_size ! third argument is the cell size of the simulation
+    read (args(4), '(f6.4)') tset ! fourth argument is the temperature set point of the simulation
+    read (args(5), '(f6.4)') vmag ! fifth argument is the velocity magnitude for collisions
+    read (args(6), '(f6.0)') ffrq ! sixth argument is the frequency of field collisions
+    ! the seventh value passed to the method is simid for the testH job
 
     ! initialize simulation
-    call initialize_simulation_settings(af = 0.2, e = 10000000, nc = 16, ac = 0.8)
+    call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
     call set_sphere_movie (status = .false.)
-    call set_square_movie (status = .true., freq = 1.)
+    call set_square_movie (status = .true., freq = 1000.)
     call set_thermostat (status = .true., temp = tset, freq = 0.1)
     call set_external_field (status = .true., freq = ffrq, force = vmag)
 
     ! initialize system
-    call initialize_system(job = "testH", sim = trim(args(4)))
+    call initialize_system(job = "testH", sim = trim(args(7)))
 
     ! run the simulation if the parameters are met
     do
