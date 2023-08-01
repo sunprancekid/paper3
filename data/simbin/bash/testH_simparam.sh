@@ -14,7 +14,7 @@ declare -i VERB_BOOL=0
 # simulation parameters should be written to has been specified
 declare -i PATH_BOOL=0
 # default path to write file to is current directory
-PATH="."
+PATH="./"
 # boolean used to determine if a file name was provided by the user
 declare -i FILE_BOOL=0
 # default file name used to write simulation parameters to
@@ -50,10 +50,83 @@ help () {
 }
 
 # function that writes testH jobs with constant velocity magnitude
-conV () {
+conT () {
 
 	## PARAMETERS
-	# 
+	# path to file that is being written to
+	SIMPARAM_PATH="${PATH}${FILE}"
+	# number of replicates
+	declare -i REPLICATES=5
+	# minimum velocity magnitude
+	declare -i VMAG_MIN=0
+	# maximum velocity magnitude
+	declare -i VMAG_MAX=150
+	# amount to increment the velocity magnitude by
+	declare -i VMAG_INC=2
+	# minimum field frequency
+	declare -i FFRQ_MIN=10
+	# maximum field frequency
+	declare -i FFRQ_MAX=600
+	# amount to increment the field frequency by
+	declare -i FFRQ_INC=5
+
+	## ARGUMENTS
+	# first argument: temperature set point for simulation
+	declare -i TEMP=$1
+	TEMP_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${TEMP} / 100 }"))
+
+	## SCRIPT
+	# inform user
+	if [[ VERB_BOOL -eq 1 ]]; then 
+		echo "generating simulation parameters in ${simparam}."
+	fi
+
+	# if the file exists, delete it
+	if test -f $SIMPARAM_PATH 
+	then 
+		rm $SIMPARAM_PATH
+	fi
+
+	# loop through variables, write to file
+	declare -i COUNT=0
+	# first variable is the velocity magnitude
+	declare -i VMAG=$VMAG_MIN
+	while [[ VMAG -le VMAG_MAX ]]; do
+
+		# write formatted velocity magnitude strings 
+		VMAG_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${VMAG} / 100 }"))
+		VMAG_STRING=$(printf '%03d' ${VMAG})
+		VMAG_SIMID="v${VMAG_STRING}"
+
+		# second variable is the field frequency
+		declare -i FFRQ=$FFRQ_MIN
+		while [[ FFRQ -le FFRQ_MAX ]]; do
+
+			# write formatted field frequency strings
+			FFRQ_VAL=$(printf '%03d' ${FFRQ})
+			FFRQ_STRING=$(printf '%03d' ${FFRQ})
+			FFRQ_SIMID="f${FFRQ_STRING}"
+
+			# loop through replicates
+			declare -i RP=1
+			while [[ RP -le REPLICATES ]]; do
+
+				SIMID="${VMAG_SIMID}${FFRQ_SIMID}"
+
+				# write the simulation parameters to the input file
+				VAR="${COUNT},${SIMID},${RP},${AF},${EVENT},${CELL},${TEMP_VAL},${VMAG_VAL},${FFRQ_VAL}"
+				echo $VAR >> $SIMPARAM_PATH
+				((RP+=1))
+				((COUNT+=1))
+			done
+
+			# increment the field frequency value
+			((FFRQ+=FFRQ_INC))
+		done
+
+		# increment the velocity magnitude value
+		((VMAG+=VMAG_INC))
+	done
 }
 
 ## OPTIONS
@@ -125,6 +198,7 @@ shift $((OPTIND-1))
 ## SCRIPT
 
 # determine the type of parameters to generate
+conT "25"
 
 # write the values to the file specified by the user
 
