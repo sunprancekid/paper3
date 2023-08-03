@@ -14,11 +14,11 @@ declare -i VERB_BOOL=0
 # simulation parameters should be written to has been specified
 declare -i PATH_BOOL=0
 # default path to write file to is current directory
-PATH="./"
+SIMPARAM_PATH="./"
 # boolean used to determine if a file name was provided by the user
 declare -i FILE_BOOL=0
 # default file name used to write simulation parameters to
-FILE="testH_param.csv"
+SIMPARAM_FILE="testH_param.csv"
 # boolean that determines if the simulation cell size has been specified
 declare -i CELL_BOOL=0
 # default cell size assigned if none is provided by the user
@@ -32,6 +32,11 @@ declare -i EVENT=100000000
 declare -i AF_BOOL=0
 # default area fraction if none is provided by the user
 declare -i AF=20
+# boolean that determines if an integer corresponding to the 
+# number of each unique set of simulation parameters should be repeated
+declare -i REP_BOOL=0
+# default number of replicates repeated by simulation
+declare -i REPLICATES=3
 # header used to organize simulation parameters
 HEADER="n,simid,rp,area_frac,events,cell,temp,vmag,ffrq"
 
@@ -40,13 +45,14 @@ HEADER="n,simid,rp,area_frac,events,cell,temp,vmag,ffrq"
 help () {
 
 	# list the script's arguments
-	echo -e "\n./testH_simparam.sh <<FLAGS>> \nScript for generating testH simulation parameters.\n"
+	echo -e "\nUSAGE :: ./testH_simparam.sh <<FLAGS>> \nScript for generating testH simulation parameters.\n"
 	echo -e "-v :: execute script verbosely."
-	echo -e "-p << ARG >> :: path to write simulation parameter files to (default is ${PATH})."
-	echo -e "-f << ARG >> :: simulation parameter filename. default file name is ${FILE}"
+	echo -e "-p << ARG >> :: path to write simulation parameter files to (default is ${SIMPARAM_PATH})."
+	echo -e "-f << ARG >> :: simulation parameter filename. default file name is ${SIMPARAM_FILE}"
 	echo -e "-a << ARG >> :: simulation area fraction as integer e2 (default value is ${AF})"
 	echo -e "-c << ARG >> :: simulation cell size (default value is ${CELL})"
 	echo -e "-e << ARG >> :: simulation events (default value is ${EVENT})"
+	echo -e "-r << ARG >> :: number of times unique simulations are repeated (default is ${REPLICATES})"
 }
 
 # function that writes testH jobs with constant velocity magnitude
@@ -54,9 +60,7 @@ conT () {
 
 	## PARAMETERS
 	# path to file that is being written to
-	SIMPARAM_PATH="${PATH}${FILE}"
-	# number of replicates
-	declare -i REPLICATES=5
+	SIMPARAM="${SIMPARAM_PATH}${SIMPARAM_FILE}"
 	# minimum velocity magnitude
 	declare -i VMAG_MIN=0
 	# maximum velocity magnitude
@@ -73,19 +77,27 @@ conT () {
 	## ARGUMENTS
 	# first argument: temperature set point for simulation
 	declare -i TEMP=$1
-	TEMP_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${TEMP} / 100 }"))
 
 	## SCRIPT
 	# inform user
 	if [[ VERB_BOOL -eq 1 ]]; then 
-		echo "generating simulation parameters in ${simparam}."
+		echo "generating simulation parameters in ${SIMPARAM}."
 	fi
 
 	# if the file exists, delete it
-	if test -f $SIMPARAM_PATH 
+	if test -f $SIMPARAM
 	then 
-		rm $SIMPARAM_PATH
+		rm $SIMPARAM
 	fi
+
+	# write area fraction string
+	AF_VAL=$(printf '%4.3f' $(awk "BEGIN { print ${AF} / 100 }"))
+
+	# write temperature val, and formatted string
+	TEMP_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${TEMP} / 100 }"))
+	TEMP_STRING=$(printf '%03d' $TEMP)
+	TEMP_SIMID="t${TEMP_STRING}"
+
 
 	# loop through variables, write to file
 	declare -i COUNT=0
@@ -111,11 +123,11 @@ conT () {
 			declare -i RP=1
 			while [[ RP -le REPLICATES ]]; do
 
-				SIMID="${VMAG_SIMID}${FFRQ_SIMID}"
+				SIMID="${TEMP_SIMID}${VMAG_SIMID}${FFRQ_SIMID}"
 
 				# write the simulation parameters to the input file
-				VAR="${COUNT},${SIMID},${RP},${AF},${EVENT},${CELL},${TEMP_VAL},${VMAG_VAL},${FFRQ_VAL}"
-				echo $VAR >> $SIMPARAM_PATH
+				VAR="${COUNT},${SIMID},${RP},${AF_VAL},${EVENT},${CELL},${TEMP_VAL},${VMAG_VAL},${FFRQ_VAL}"
+				echo $VAR >> $SIMPARAM
 				((RP+=1))
 				((COUNT+=1))
 			done
@@ -127,10 +139,12 @@ conT () {
 		# increment the velocity magnitude value
 		((VMAG+=VMAG_INC))
 	done
+
+	# TODO :: ADD verbose statement with information about the parameters that were generated
 }
 
 ## OPTIONS
-while getopts "a:c:e:f:p:v" options; do 
+while getopts "a:c:e:f:p:r:v" options; do 
 	case $options in 
 		a) # simulation area fraction specified by user
 
@@ -165,7 +179,7 @@ while getopts "a:c:e:f:p:v" options; do
 			declare -i FILE_BOOL=1
 
 			# parse the value from the user, overwrite the old value
-			FILE=${OPTARG}
+			SIMPARAM_FILE=${OPTARG}
 
 			;;
 		p) # path to write file to was provided by the user
@@ -174,8 +188,11 @@ while getopts "a:c:e:f:p:v" options; do
 			declare -i PATH_BOOL=1
 
 			# parse the value, overwrite the old value
-			PATH=${OPTARG}
+			SIMPARAM_PATH=${OPTARG}
 
+			;;
+		r) # number of times each unique set of parameters should be repeated
+			
 			;;
 		v) # execute the script verbosely
 			
@@ -198,7 +215,6 @@ shift $((OPTIND-1))
 ## SCRIPT
 
 # determine the type of parameters to generate
-conT "25"
-
 # write the values to the file specified by the user
+conT 25
 

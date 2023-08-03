@@ -28,6 +28,8 @@ JOB="testH"
 MODEL="polsqu2x2"
 # default cell size of simulation
 declare -i CELL=16
+# default simulation area fraction
+declare -i AREA_FRACTION=15
 # default area fraction of simulation
 declare -i ETA=20
 # default number of simulation events
@@ -188,7 +190,6 @@ gensim () {
 	echo "${GFORT} -o testH.ex testH.o polsqu2x2_mod.o" >> $EXECUTE
 	echo "./testH.ex \$1 \$2 \$3 \$4 \$5 \$6 \$7" >> $EXECUTE
 	chmod u+x ${EXECUTE}
-
 }
 
 # function that generates submit script for CHTC workflow
@@ -251,8 +252,8 @@ genCHTCsub () {
 gensimparam () {
 
 	## PARAMETERS
-	# file containing simulation parameters
-	local simparam="${D}/${JOB}.csv"
+	# path to script that generates scripts
+	local SIMP="./simbin/bash/testH_simparam.sh"
 
 	## OPTIONS
 	# none
@@ -261,73 +262,19 @@ gensimparam () {
 	# none
 
 	## SCRIPT
-
-	# inform user
-	if [[ VERB_BOOL -eq 1 ]]; then 
-		echo "generating simulation parameters in ${simparam}."
+	# compile flags for script execution
+	local flags=""
+	# execture verbosely
+	if [[ VERB_BOOL -eq 1 ]]; then
+		flags="${flags} -v"
 	fi
+	# path to file and file name
+	flags="${flags} -p ${D}/ -f ${JOB}.csv"
+	# simulation parameters
+	flags="${flags} -c ${CELL} -e ${EVENTS} -a ${AREA_FRACTION}"
 
-	# delete the file, if it exists
-	if test -f $simparam
-	then
-		rm $simparam
-	fi
-
-	# generate simulation parameters by loop through all possible 
-	# combinations
-	declare -i COUNT=0
-	declare -i TEMP=$TEMP_MIN
-	while [[ TEMP -le $TEMP_MAX ]]
-	do
-
-		# generate directory, formatted string for temp values
-		TEMP_VAL=$(printf '%3.2f' $(awk "BEGIN { print $TEMP / 100 }"))
-		TEMP_STRING=$(printf '%03d' ${TEMP})
-		D2="t${TEMP_STRING}"
-
-		declare -i VMAG=$VMAG_MIN
-		while [[ VMAG -le VMAG_MAX ]]
-		do
-
-			# generate directory, formatted string for vmag values
-			VMAG_VAL=$(printf '%3.2f' $(awk "BEGIN { print $VMAG / 100}"))
-			VMAG_STRING=$(printf '%03d' ${VMAG})
-			D3="v${VMAG_STRING}"
-
-			declare -i FFRQ=$FFRQ_MIN
-			while [[ FFRQ -le FFRQ_MAX ]]
-			do
-
-				# generate directory, formatted string for the field frequenct values
-				FFRQ_VAL=$(printf '%03d' ${FFRQ})
-				FFRQ_STRING=$(printf '%03d' ${FFRQ})
-				D4="f${FFRQ_STRING}"
-
-				# establish directory and simulation id
-				SIMID="${D2}${D3}${D4}"
-
-				declare -i RP=1
-				while [[ RP -le REPLICATE ]]
-				do
-
-					# write the simulation parameters to the input file
-					echo "${COUNT},${SIMID},${RP},${TEMP_VAL},${VMAG_VAL},${FFRQ_VAL}" >> $simparam
-					((RP+=1))
-					((COUNT+=1))
-
-				done
-
-				# decriment the field frequency
-				((FFRQ+=FFRQ_INC))
-			done
-
-			# increment the velocity magnitude by the specified amount
-			((VMAG+=VMAG_INC))
-		done
-
-		# increment the temperature set point by the speficied amount
-		((TEMP+=TEMP_INC))
-	done
+	# call script with flags
+	$SIMP $flags
 }
 
 # function that generates submission script for DAGMAN workflow
@@ -436,14 +383,13 @@ then
 	# generate simulation programs
 	gensim
 
+	# generate simulation parameters and store in file
+	gensimparam
 	exit 0
 
 	# generate submit file for testH simulations
 	SUB="${D}/${JOBID}.sub"
 	genCHTCsub $SUB
-
-	# generate simulation parameters and store in file
-	gensimparam
 
 	# submit simulations to chtc condor
 	MAIN=$PWD
