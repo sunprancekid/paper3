@@ -193,6 +193,12 @@ while getopts "a:c:e:f:p:r:v" options; do
 			;;
 		r) # number of times each unique set of parameters should be repeated
 			
+			# boolean that determines if a unique number of replicates was specified
+			# by the user
+			declare -i REP_BOOL=1
+
+			# parse the value, overwrite default
+			REPLICATES=${OPTARG}
 			;;
 		v) # execute the script verbosely
 			

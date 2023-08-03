@@ -196,7 +196,7 @@ gensim () {
 genCHTCsub () {
 
 	## PARAMETERS
-	# name of simulation files generated with default rod4 module
+	# name of simulation files generated with default polsqu module
 	simname="testH\$(simid)"
 	# list of files that are transfered to the execute node
 	local transin="fortran/polsqu2x2_mod.f90, fortran/testH.f90"
@@ -204,13 +204,15 @@ genCHTCsub () {
 	local transout="${simname}.txt, ${simname}_anneal.csv"
 	# list of remap instructions for files transfered from execute node
 	local transoutremap="${simname}.txt=txt/\$(simid)_\$(rp).txt; ${simname}_anneal.csv=anneal/\$(simid)_\$(rp)_anneal.csv"
+	# name of the CHTC submission file
+	local sub="${D}/${JOB}.sub"
 
 	## OPTIONS
 	# none
 
 	## ARGUMENTS
 	# first argument: name of file containing CHTC submission instructions
-	local sub=$1
+	# local sub=$1
 
 	## SCRIPT
 	# inform user
@@ -385,11 +387,11 @@ then
 
 	# generate simulation parameters and store in file
 	gensimparam
-	exit 0
 
 	# generate submit file for testH simulations
-	SUB="${D}/${JOBID}.sub"
-	genCHTCsub $SUB
+	# SUB="${D}/${JOBID}.sub"
+	genCHTCsub 
+	exit 0
 
 	# submit simulations to chtc condor
 	MAIN=$PWD
