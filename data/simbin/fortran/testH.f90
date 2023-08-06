@@ -42,6 +42,10 @@ program testH
     read (args(6), '(f6.0)') ffrq ! sixth argument is the frequency of field collisions
     ! the seventh value passed to the method is simid for the testH job
 
+    ! increment vmag if it is equal to zero
+    if (.not. (vmag > 0.))) then
+        vmag = vmag + 0.0001
+
     ! initialize simulation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
     call set_sphere_movie (status = .false.)
