@@ -348,6 +348,7 @@ type(property) :: fullo ! fully assembled order parameter for same and opposite 
 type(property) :: percy ! percolation order parameter
 type(property) :: nclust ! number of clusters identified by percolation algorithm 
 type(property) :: nematic ! nematic order parameter between all squares
+type(property) :: allign
 ! ** efficiency methods **************************************
 real(kind=dbl) :: dispTotal ! displacement of fastest particle between neighborlist updates
 logical :: nbrnow ! update neighbor list?
@@ -2193,7 +2194,7 @@ subroutine open_files ()
 
     annealfile = trim(jobid) // trim(simid) // '_anneal.csv' ! comma seperated list containing a summary of annealing simulations
     open (unit = annealiounit, file = trim(annealfile), status = 'REPLACE', iostat = ioerror)
-    write(annealiounit,*) 'id, time, set, temp, te, te_fluc, pot, pot_fluc, ke, ke_fluc, nematic, nem_fluc'
+    write(annealiounit,*) 'id, time, set, temp, te, te_fluc, pot, pot_fluc, ke, ke_fluc, nematic, nem_fluc, allign, allign_fluc'
 
     reportfile = trim(jobid) // trim (simid) // '.csv' ! comma seperated list containing time progression of properties 
     open (unit = reportiounit, file = reportfile, status = 'REPLACE')
@@ -2209,7 +2210,7 @@ subroutine open_files ()
         ' poly2, poly2_fluc, full, full_fluc, fulls, fulls_fluc, ,fullo, ', &
         'fullo_fluc, poly1aa, poly1aa_fluc, poly1abba, poly1abba_fluc,',&
         ' poly1bb, poly1bb_fluc, poly1, poly1_fluc, percolation, nclust,',&
-        ' nclust_fluc, nematic, nematic_fluc'
+        ' nclust_fluc, nematic, nematic_fluc, allign, allign_fluc'
 
     mmfile = trim(jobid) // trim(simid) // '_mm.csv'
     open (unit = mmiounit, file = trim(mmfile), status = 'REPLACE')
@@ -2247,6 +2248,7 @@ subroutine close_files ()
     call accumulate_properties (percy, 5)
     call accumulate_properties (nclust, 5)
     call accumulate_properties (nematic, 5)
+    call accumulate_properties (allign, 5)
 
     ! report information and close files
     write(simiounit,*) '*** End of Molecular Simulation ***'
@@ -2318,7 +2320,7 @@ subroutine close_files ()
     close (unit = opiounit, status = 'KEEP')
     write(annealiounit, *) anneal, ',', timenow, ',', tempset, ',', temp%equilavg, ',', te%equilavg, & 
         ',', te%equilstd, ',', pot%equilavg, ',', pot%equilstd, ',', ke%equilavg,',', ke%equilstd, &
-        ',', nematic%equilavg , ',', nematic%equilstd
+        ',', nematic%equilavg , ',', nematic%equilstd, ',', allign%equilavg, ',', allign%equilstd
     close (unit = annealiounit, status = 'KEEP')
 
     write(mmiounit, *) boundary_index, ',', upper_nematic_boundary, ',', lower_nematic_boundary, ',', &
@@ -2521,6 +2523,7 @@ subroutine report_properties()
     call accumulate_properties (percy, 3) ! calculate the average percolation order parameter value
     call accumulate_properties (nclust, 3) ! calculate the average number of clusters
     call accumulate_properties (nematic, 3) ! calculate the average nematic order parameter 
+    call accumulate_properties (allign, 3)
     z%value = (pv%sum / (2. * real(cube) * timeperiod * temp%sum)) + real(mer) ! calculate compressability factor, equation 8 in Erpenbeck et al.
 
     ! report values to the user 
@@ -2535,7 +2538,7 @@ subroutine report_properties()
         ',', fulls%sum, ',', fulls%sum2, ',', fullo%sum, ',', fullo%sum2, ',', poly1aa%sum, ',', poly1aa%sum2, &
         ',', poly1abba%sum, ',', poly1abba%sum2, ',', poly1bb%sum, ',', poly1bb%sum2, ',', &
         poly1%sum,',', poly1%sum2, ',', percy%sum, ',', nclust%sum, ',', nclust%sum2, ',', nematic%sum, &
-        ',', nematic%sum2
+        ',', nematic%sum2, ',', allign%sum, ',', allign%sum2
 
     ! if the system has equilibraited, accumulate equilibrium sums
 	if (n_events > event_equilibriate) then 
@@ -2560,6 +2563,7 @@ subroutine report_properties()
         call accumulate_properties (percy, 4)
         call accumulate_properties (nclust, 4)
         call accumulate_properties (nematic, 4)
+        call accumulate_properties (allign, 4)
         call accumulate_properties (z, 2)
 	end if 
 
@@ -2586,6 +2590,7 @@ subroutine report_properties()
     call accumulate_properties (percy, 1)
     call accumulate_properties (nclust, 1)
     call accumulate_properties (nematic, 1)
+    call accumulate_properties (allign, 1)
     timeperiod = 0.
 end subroutine report_properties
 
@@ -2621,6 +2626,7 @@ subroutine initialize_properties ()
     call accumulate_properties (percy, 0)
     call accumulate_properties (nclust, 0)
     call accumulate_properties (nematic, 0)
+    call accumulate_properties (allign, 0)
 end subroutine initialize_properties
 
 subroutine calculate_poperties()
@@ -2689,6 +2695,9 @@ subroutine calculate_poperties()
     ! ** nematic *************************************************
     call determine_nematic (nematic%value)
     call accumulate_properties (nematic, 2)
+    ! ** allignment **********************************************
+    call calculate_allignment (allign%value)
+    call accumulate_properties (allign, 2)
 end subroutine calculate_poperties
 
 subroutine accumulate_potential (potential)
@@ -3217,6 +3226,58 @@ subroutine determine_nematic(nematic)
     nematic = (3. * nematic - 1.) / 2.
 end subroutine determine_nematic
 
+! // allignment order parameter //
+
+subroutine calculate_allignment(op)
+    implicit none 
+    real(kind=dbl) :: op
+    integer :: i, m, q ! indexing
+    real(kind=dbl), dimension(cube) :: phi ! orientation of each colloid relative to the x-axis
+    type(position), dimension(mer) :: rcircles ! position of all disks making the colloid
+    type(position) :: dr ! used as intermediary for angle calculation
+
+    !! TODO :: update allignment order parameter so that the allignment is measured
+    !!         relative to the external field (right now, diredction is assumed to be y-axis)
+
+    ! loop through particles, 
+    ! measure angle relative to external field
+    ! initialize variables
+    phi = 0.
+    op = 0.
+
+    ! calculate and store the orientation of each particle relative to the x-axis
+    do i = 1, cube 
+        ! calculate the real position of all of the circles from the false position
+        do m = 1, mer 
+            do q = 1, ndim 
+                rcircles(m)%r(q) = square(i)%circle(m)%fpos%r(q) + square(i)%circle(m)%vel%v(q) * tsl 
+            enddo
+            call apply_periodic_boundaries (rcircles(m))
+        enddo
+
+        ! calculate the angle of the colloid relative to the x-axis
+        phi(i) = 0.
+        do q = 1, ndim 
+            dr%r(q) = rcircles(1)%r(q) - rcircles(mer)%r(q) ! orientation of rod from first to last disc
+            if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
+            if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
+            phi(i) = phi(i) + (dr%r(q) ** 2)
+        enddo
+        phi(i) = sqrt(phi(i)) ! distance vector
+        phi(i) = (dr%r(2)) / phi(i) ! normalized y-distance
+        ! phi(i) = asin(phi(i)) ! bounds [-1, 1], range [-halfpi, halfpi] 
+        ! if (dr%r(1) < 0.) phi(i) = -phi(i)
+    end do
+
+    ! calculate the angle of the particle relative to
+    ! the direction of the field
+    do i = 1, cube
+        op = op + phi(i)
+    enddo
+
+    ! average and return
+    op = op / real(cube)
+end subroutine calculate_allignment
 
 ! ** event scheduling *****************************************
 
