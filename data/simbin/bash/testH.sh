@@ -205,14 +205,14 @@ genCHTCsub () {
 	# list of remap instructions for files transfered from execute node
 	local transoutremap="${simname}.txt=txt/\$(simid)_\$(rp).txt; ${simname}_anneal.csv=anneal/\$(simid)_\$(rp)_anneal.csv"
 	# name of the CHTC submission file
-	local sub="${D}/${JOB}.sub"
+	# local sub="${D}/${JOB}.sub"
 
 	## OPTIONS
 	# none
 
 	## ARGUMENTS
 	# first argument: name of file containing CHTC submission instructions
-	# local sub=$1
+	local sub="${D}/${1}.sub"
 
 	## SCRIPT
 	# inform user
@@ -390,8 +390,8 @@ then
 
 	# generate submit file for testH simulations
 	# SUB="${D}/${JOBID}.sub"
-	genCHTCsub 
-	exit 0
+	genCHTCsub ${JOBID}
+	# exit 0
 
 	# submit simulations to chtc condor
 	MAIN=$PWD
