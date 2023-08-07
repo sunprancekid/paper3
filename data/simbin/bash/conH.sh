@@ -74,5 +74,8 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 	# establish the achirality directory
 	ACHAI_STRING=${printf '%03d' ${ACHAI}}
 	D2="a${ACHAI_STRING}"
+
+	# second simulation parameters is the external field strength
+	declare -i FIELD=
 done
 
