@@ -43,8 +43,9 @@ program testH
     ! the seventh value passed to the method is simid for the testH job
 
     ! increment vmag if it is equal to zero
-    if (.not. (vmag > 0.))) then
+    if (.not. (vmag > 0.)) then
         vmag = vmag + 0.0001
+    endif
 
     ! initialize simulation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
