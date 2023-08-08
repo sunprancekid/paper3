@@ -7,8 +7,12 @@ set -e
 
 
 ## PARAMETERS
+# non-zero exit code that specifies that if error has occured during script execution
+declare -i NONZERO_EXITCODE=120
 # boolean that determines if the verbose flag was specified
 declare -i VERB_BOOL=0
+# boolean that determines if the the script should utilize existing save files
+declare -i SAVE_BOOL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
@@ -47,22 +51,68 @@ help () {
 
 	echo -e "\nScript for generating conH jobs on CHTC systems.\nUSAGE: ./conH.sh << FLAGS >>\n"
 	echo -e " -v           | execute script verbosely"
+	echo -e " -s           | restart annealing simulation according to existing save files"
 	echo -e " -j << ARG >> | specify job title (default is ${JOB})"
 	echo -e " -c << ARG >> | specify simulation cell size (default is ${CELL})"
 }
 
+# script for generating files for annealing simulations
+gensim () {
+
+	# TODO :: implement script for generating annealing simulations
+
+}
 
 ## OPTIONS
+# parse options
+while getopts "vsj:c:" option; do 
+	case $option in
+		v) # execute script verbosely
+			
+			# boolean that determines if the script should execute verbosely
+			declare -i VERB_BOOL=1
+			;;
+		s) # rerun script for existing save files
+			
+			# boolean that determines if the script should
+			# utilize existing save files
+			declare -i SAVE_BOOL=1
+			;;
+		j) # specify the name of the job
+			
+			# parse the job name from the flag
+			JOB="${OPTARG}"
+			;;
+		c) # specify the cell size 
+
+			# parse the cell size from the flag
+			declare -i CELL="${OPTARG}"
+			;;
+		\?) # default if illegal argument specified
+			
+			echo -e "\nIllegal argument ${option} specified.\n"
+			help()
+			exit $NONZERO_EXITCODE
+	esac
+done
+shift $((OPTIND-1))
+
+
+## ARGUMENTS
 # none
 
 
 ## SCRIPT
-
-# TODO :: establish DAGMAN files
-
-# TODO :: establish directories
+# establish initial directories
 D0=${JOB}
 D1=${SIM_MOD}_${CELL}
+
+# establish DAGMAN files
+JOBID="${JOB}_${SIM_MOD}"
+DAG="${JOBID}.dag"
+if [[ SAVE_BOOL -eq 1 ]]; then 
+	DAG="${JOBID}_save.dag"
+fi
 
 # TODO :: incorperate dipole into simulation parameters
 
@@ -76,6 +126,46 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 	D2="a${ACHAI_STRING}"
 
 	# second simulation parameters is the external field strength
-	declare -i FIELD=
+	declare -i FIELD=$FIELD_MIN
+	while [[ FIELD -le FIELD_MIN ]]; do
+
+		# establish the field directory
+		FIELD_STRING=${printf '%02d' ${FIELD}}
+		D3="h${FIELD_STRING}"
+
+		# third simulation parameter is the system density
+		declare -i ETA=$ETA_MIN
+		while [[ ETA -le ETA_MIN ]]; do 
+
+			# establish the density directory
+			ETA_STRING=${printf '%02d' ${ETA}}
+			D4="e${ETA_STRING}"
+
+			# establish directory path
+			D="./${D0}/${D1}/${D2}/${D3}/${D4}/"
+
+			# establish annealing simulation id
+			ANNEALID="${D2}${D3}${D4}"
+			SUBDAG="${ANNEALID}.spl"
+			if [[ SAVE_BOOL -eq 1 ]]; then
+				SUBDAG="${ANNEALID}_save.spl"
+			fi
+
+			# generate simulation files
+			gensim()
+
+			# add annealing simulation to subdag
+			echo "SPLICE ${ANNEALID} ${SUBDAG} DIR ${D}" >> $DAG
+
+			# increment density
+			((ETA+=ETA_INC))
+		done
+
+	# increment field string
+	((FIELD+=FIELD_INC))
+	done
+
+# increment chirality
+((ACHAI+=ACHAI_INC))
 done
 

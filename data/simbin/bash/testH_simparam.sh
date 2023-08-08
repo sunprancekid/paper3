@@ -46,7 +46,7 @@ help () {
 
 	# list the script's arguments
 	echo -e "\nUSAGE :: ./testH_simparam.sh <<FLAGS>> \nScript for generating testH simulation parameters.\n"
-	echo -e "-v :: execute script verbosely."
+	echo -e "-v           :: execute script verbosely."
 	echo -e "-p << ARG >> :: path to write simulation parameter files to (default is ${SIMPARAM_PATH})."
 	echo -e "-f << ARG >> :: simulation parameter filename. default file name is ${SIMPARAM_FILE}"
 	echo -e "-a << ARG >> :: simulation area fraction as integer e2 (default value is ${AF})"
