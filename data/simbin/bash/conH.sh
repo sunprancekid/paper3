@@ -11,8 +11,9 @@ set -e
 declare -i NONZERO_EXITCODE=120
 # boolean that determines if the verbose flag was specified
 declare -i VERB_BOOL=0
-# boolean that determines if the the script should utilize existing save files
-declare -i SAVE_BOOL=0
+# boolean that determines if the the script should overwrite directories
+# containing existing simulation files that correspond to job
+declare -i OVERWRITE_BOOL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
@@ -51,7 +52,7 @@ help () {
 
 	echo -e "\nScript for generating conH jobs on CHTC systems.\nUSAGE: ./conH.sh << FLAGS >>\n"
 	echo -e " -v           | execute script verbosely"
-	echo -e " -s           | restart annealing simulation according to existing save files"
+	echo -e " -o           | overwrite existing simulation files and directories corresponding to job"
 	echo -e " -j << ARG >> | specify job title (default is ${JOB})"
 	echo -e " -c << ARG >> | specify simulation cell size (default is ${CELL})"
 }
@@ -65,18 +66,18 @@ gensim () {
 
 ## OPTIONS
 # parse options
-while getopts "vsj:c:" option; do 
+while getopts "voj:c:" option; do 
 	case $option in
 		v) # execute script verbosely
 			
 			# boolean that determines if the script should execute verbosely
 			declare -i VERB_BOOL=1
 			;;
-		s) # rerun script for existing save files
+		o) # overwrite existing simulation directories
 			
 			# boolean that determines if the script should
-			# utilize existing save files
-			declare -i SAVE_BOOL=1
+			# overwrite existing simulation data corresponding to job
+			declare -i OVERWRITE_BOOL=1
 			;;
 		j) # specify the name of the job
 			
@@ -110,9 +111,6 @@ D1=${SIM_MOD}_${CELL}
 # establish DAGMAN files
 JOBID="${JOB}_${SIM_MOD}"
 DAG="${JOBID}.dag"
-if [[ SAVE_BOOL -eq 1 ]]; then 
-	DAG="${JOBID}_save.dag"
-fi
 
 # TODO :: incorperate dipole into simulation parameters
 
@@ -147,9 +145,6 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 			# establish annealing simulation id
 			ANNEALID="${D2}${D3}${D4}"
 			SUBDAG="${ANNEALID}.spl"
-			if [[ SAVE_BOOL -eq 1 ]]; then
-				SUBDAG="${ANNEALID}_save.spl"
-			fi
 
 			# generate simulation files
 			gensim()
