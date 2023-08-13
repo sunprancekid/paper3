@@ -33,6 +33,7 @@ POLSQU_MOD=polsqu2x2_mod
 POLSQU_SIM=polsqu2x2_sim
 TESTH_SIM=testH
 CONH_INIT=conH_init
+CONH_ANNEAL=conH_anneal
 
 polsqu_test: clean
 	# compile module, simulation program
@@ -61,6 +62,13 @@ polsqu_conH_init: clean
 	# link module and program
 	$(FORT) -o $(CONH_INIT).ex $(CONH_INIT).o $(POLSQU_MOD).o
 	./$(CONH_INIT).ex conH test 0.2 12 1.0 0.5 3.0 1000000 0.96
+
+polsqu_conH_anneal:
+	# compile the module, simulation program, without cleaning the previous simulation files
+	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(CONH_ANNEAL).f90
+	# link module and program
+	$(FORT) -o $(CONH_INIT).ex $(CONH_ANNEAL).o $(POLSQU_MOD).o
+	./$(CONH_ANNEAL).ex conH test 0.2 12 1.0 0.5 1000000
 
 
 # rod3_test: clean
