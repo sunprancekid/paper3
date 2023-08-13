@@ -5,7 +5,7 @@
 program conH_init
     use polarizedsquaremodule
     implicit none
-    integer, parameter :: N_ARGS = 9 ! number of arguments accepted by simulation file
+    integer, parameter :: N_ARGS = 7 ! number of arguments accepted by simulation file
     integer :: a  ! number of arguments determined by program
     character(len=12), dimension(:), allocatable :: args
     ! arguments to parse from the command line

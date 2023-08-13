@@ -487,7 +487,7 @@ function single_step () result (stop)
         call update_positions()
         ! TODO: if the milestone has not been reached, add time to the current index
         call save () ! save the final state of the simulation 
-        ! call exit (CHECKPOINT_EXITCODE) ! if a boundary has not been reach, repeat the simulation
+        call exit (CHECKPOINT_EXITCODE) ! if a boundary has not been reach, repeat the simulation
     end if 
 end function single_step
 

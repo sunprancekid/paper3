@@ -68,7 +68,7 @@ gensimdir () {
 
 	## PARAMETERS
 	# list of sub directories to generate inside the main directory
-	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" )
+	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" "anneal/tmp" )
 	# list of fortran files that should be copied to the simulation directory
 	FORTRAN_FILES=( "conH_init.f90" "conH_anneal.f90" "polsqu2x2_mod.f90" )
 
@@ -154,6 +154,26 @@ genCHTCinit() {
 	EXEC_NAME="sub/exec/conH_init.sh"
 	# name of the executable
 	EXEC_PATH="${D}${EXEC_NAME}"
+	# id for the simulation that the initialization node is being generated for
+	SIM_ID="${D}${ANNEALID}"
+
+	## PARAMETERS - FILES
+	# movie file
+	SIM_MOV="${SIM_ID}_squmov.xyz"
+	# text file
+	SIM_TXT="${SIM_ID}.txt"
+	# anneal file
+	SIM_ANN="${SIM_ID}_anneal.csv"
+	# annealing save file
+	SIM_ANN_SAVE="${SIM_ID}__annealSAVE.dat"
+	# chirality save file
+	SIM_CHAI_SAVE="${SIM_ID}__chaiSAVE.dat"
+	# false position save file
+	SIM_FPOS_SAVE="${SIM_ID}__fposSAVE.dat"
+	# velocity save file
+	SIM_VEL_SAVE="${SIM_ID}__velSAVE.dat"
+	# simulation setting sim file
+	SIM_SIM_SAVE="${SIM_ID}__simSAVE.dat"
 
 	## PARAMETERS - SUBMISSION INTRUCTIONS
 	# memory to request
@@ -162,12 +182,21 @@ genCHTCinit() {
 	REQUEST_DISK="1GB"
 	# directory that output files are remapped to
 	REMAP="anneal/init/"
+	# list of files with remapping instructions
+	RMP_SIM_MOV="${SIM_MOV}=${REMAP}${SIM_MOV}"
+	RMP_SIM_TXT="${SIM_TXT}=${REMAP}${SIM_TXT}"
+	RMP_SIM_ANN="${SIM_ANN}=${REMAP}${SIM_ANN}"
+	RMP_SIM_ANN_SAVE="${SIM_ANN_SAVE}=${REMAP}${SIM_ANN_SAVE}"
+	RMP_SIM_CHAI_SAVE="${SIM_CHAI_SAVE}=${REMAP}${SIM_CHAI_SAVE}"
+	RMP_SIM_FPOS_SAVE="${SIM_FPOS_SAVE}=${REMAP}${SIM_FPOS_SAVE}"
+	RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
+	RMP_SIM_SIM_SAVE="${SIM_ANN_SAVE}=${REMAP}${SIM_ANN_SAVE}"
 	# list of files that should be transfered to the execute node
 	TRANSFER_INPUT_FILES="sub/fortran/conH_init.f90, sub/fortran/polsqu2x2_mod.f90"
 	# list of files that should be transfered from the execute node
-	TRANSFER_OUTPUT_FILES=""
+	TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
-	TRANSFER_OUTPUT_REMAPS=""
+	TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 	## PARAMETERS - EXECUTION INSTRUCTIONS
 	# 
@@ -184,7 +213,7 @@ genCHTCinit() {
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
 	echo "transfer_output_files = ${TRANSFER_OUTPUT_FILES}" >> $SUB_PATH
-	echo "transfer_output_remaps = ${TRANSFER_OUTPUT_REMAPS}" >> $SUB_PATH
+	echo "transfer_output_remaps = \"${TRANSFER_OUTPUT_REMAPS}\"" >> $SUB_PATH
 	echo "when_to_transfer_output = ON_SUCCESS" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "log = out/init.log" >> $SUB_PATH

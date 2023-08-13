@@ -67,7 +67,7 @@ polsqu_conH_anneal:
 	# compile the module, simulation program, without cleaning the previous simulation files
 	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(CONH_ANNEAL).f90
 	# link module and program
-	$(FORT) -o $(CONH_INIT).ex $(CONH_ANNEAL).o $(POLSQU_MOD).o
+	$(FORT) -o $(CONH_ANNEAL).ex $(CONH_ANNEAL).o $(POLSQU_MOD).o
 	./$(CONH_ANNEAL).ex conH test 0.2 12 1.0 0.5 1000000
 
 
