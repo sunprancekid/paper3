@@ -255,7 +255,7 @@ gensimparam () {
 
 	## PARAMETERS
 	# path to script that generates scripts
-	local SIMP="./simbin/bash/testH_simparam.sh"
+	local SIMP="./simbin/bash/chtc/testH_simparam.sh"
 
 	## OPTIONS
 	# none
@@ -277,83 +277,6 @@ gensimparam () {
 
 	# call script with flags
 	$SIMP $flags
-}
-
-# function that generates submission script for DAGMAN workflow
-genDAGsub () {
-
-	## PARAMETERS
-	# name of the submit file
-	SUBMIT="/sub/${SIMID}.sub"
-	# formatted integer string represent the number of iterations
-	# the simulation has completed
-	INTSTRING=$(printf '%03d' 0)
-	# formated string for files produced by simulation
-	OUTNAME="${JOBID}_${SIMID}_${INTSTRING}"
-	# name of files to export from CHTC execute node
-	TXT="${OUTNAME}.txt"
-	ANNEAL="${OUTNAME}_anneal.csv"
-	MOV="${OUTNAME}_objmov.xyz"
-	SAVEPOS="${OUTNAME}__fposSAVE.dat"
-	SAVEANN="${OUTNAME}__annSAVE.dat"
-	SAVECHAI="${OUTNAME}__chaiSAVE.dat"
-	SAVESIM="${OUTNAME}__simSAVE.dat"
-	SAVEVEL="${OUTNAME}__velSAVE.dat"
-	# remapping instructions for export files
-	REMAP_TXT="${TXT}=txt/${TXT}"
-	REMAP_ANNEAL="${ANNEAL}=anneal/${ANNEAL}"
-	REMAP_MOV="${MOV}=mov/${MOV}"
-	REMAP_SAVEPOS="${SAVEPOS}=save/${SAVEPOS}"
-	REMAP_SAVEANN="${SAVEANN}=save/${SAVEANN}"
-	REMAP_SAVECHAI="${SAVECHAI}=save/${SAVECHAI}"
-	REMAP_SAVESIM="${SAVESIM}=save/${SAVESIM}"
-	REMAP_SAVEVEL="${SAVEVEL}=save/${SAVEVEL}"
-	# list of input files
-	TRANSIN="testH.f90, rod4mod.f90"
-	# list of output files
-	TRANSOUT="${TXT}, ${ANNEAL}, ${MOV}, ${SAVEPOS}, ${SAVEANN}, ${SAVECHAI}, ${SAVESIM}, ${SAVEVEL}"
-	# list of output files with remapping instructions
-	TRANSOUTREMAP="${REMAP_TXT}; ${REMAP_ANNEAL}; ${REMAP_MOV}; ${REMAP_SAVEPOS}; ${REMAP_SAVECHAI}; ${REMAP_SAVESIM}; ${REMAP_SAVEANN}; ${REMAP_SAVEVEL}"
-
-
-	## OPTIONS
-	# none
-
-
-	## ARGUMENTS
-	# none
-
-
-	## SCRIPT
-	
-	# inform user
-	if [[ VERB_BOOL -eq 1 ]]; then 
-		echo "generating ${SUBMIT} in ${D}."
-	fi
-
-	# generate script
-	echo "executable = ${SIMID}.sh" > "${D}${SUBMIT}"
-	echo "" >> "${D}${SUBMIT}"
-	echo "should_transfer_files = YES" >> "${D}${SUBMIT}"
-	echo "transfer_input_files = ${TRANSIN}" >> "${D}${SUBMIT}"
-	echo "transfer_output_files = ${TRANSOUT}" >> "${D}${SUBMIT}"
-	echo "transfer_output_remaps = \"${TRANSOUTREMAP}\"" >> "${D}${SUBMIT}"
-	echo "when_to_transfer_output = ON_SUCCESS" >> "${D}${SUBMIT}"
-	echo "" >> "${D}${SUBMIT}"
-	echo "log = out/${SIMID}.log" >> "${D}${SUBMIT}"
-	echo "error = out/${SIMID}.err" >> "${D}${SUBMIT}"
-	echo "output = out/${SIMID}.out" >> "${D}${SUBMIT}"
-	#echo "stream_error = True" >> "${D}${SUBMIT}" # FOR DEBUGGING
-	#echo "stream_output = True" >> "${D}${SUBMIT}" # FOR DUBUGGING 
-	echo "" >> "${D}${SUBMIT}"
-	echo "request_cpus = 1" >> "${D}${SUBMIT}"
-	echo "request_disk = 100MB" >> "${D}${SUBMIT}"
-	echo "request_memory = 500MB" >> "${D}${SUBMIT}"
-	echo "" >> "${D}${SUBMIT}"
-	echo "requirements = (HAS_GCC == true) && (HAS_AVX2 == true) && (Mips > 30000)" >> "${D}${SUBMIT}"
-	echo "+ProjectName=\"NCSU_Hall\"" >> "${D}${SUBMIT}"
-	echo "" >> "${D}${SUBMIT}"
-	echo "queue" >> "${D}${SUBMIT}"
 }
 
 ## SCRIPT

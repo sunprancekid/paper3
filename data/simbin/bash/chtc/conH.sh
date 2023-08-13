@@ -64,11 +64,13 @@ help () {
 }
 
 # script for generating files for annealing simulations
-gensim () {
+gensimdir () {
 
 	## PARAMETERS
 	# list of sub directories to generate inside the main directory
-	SUBDIR=( "mov" "save" "anneal" "out" "txt" "sub" "fortran" )
+	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" )
+	# list of fortran files that should be copied to the simulation directory
+	FORTRAN_FILES=( "conH_init.f90" "conH_anneal.f90" "polsqu2x2_mod.f90" )
 
 
 	## ARGUMENTS
@@ -124,20 +126,92 @@ gensim () {
 
 	# write files to directory
 	# fortran files
-	copy_fortran
-	# pre / post - script wrappers
-	write_wrappers
-	# write execute node execution script
-	write_execute
-
-	exit 0
-
-	# write submission scripts
+	for ff in ${FORTRAN_FILES[@]}; do
+		# copy each fortran file from the fortran bin to the simulation directory fortan repo
+		cp "./simbin/fortran/${ff}" "${D}sub/fortran/"
+	done
+	# pre / post - script wrappers for annealing simulations
+	cp ./simbin/bash/chtc/anneal_wrappers/* "${D}"
+	# TODO :: add execution status to each script
 	# initialize the subdag
-	# add submission instructions to the subdag
-	# look for existing save files, if they have not been overwritten
+	SUBDAG="${D}${SUBDAG}"
+	if [[ -f "$SUBDAG" ]]; then 
+		# if the file exists, remove it
+		rm "$SUBDAG"
+	fi
+}
+
+# script for generation the initialization conH node
+# the initialization node accepts the simulation parameters
+# as inputs, and establishes the save files which the annealing
+# simulation will iterate
+genCHTCinit() {
+
+	## PARAMETERS
+	# path to submission instructions
+	SUB_PATH="${D}sub/init.sub"
+	# name of the executable file
+	EXEC_NAME="sub/exec/conH_init.sh"
+	# name of the executable
+	EXEC_PATH="${D}${EXEC_NAME}"
+
+	## PARAMETERS - SUBMISSION INTRUCTIONS
+	# memory to request
+	REQUEST_MEMORY="500MB"
+	# disk space to request
+	REQUEST_DISK="1GB"
+	# directory that output files are remapped to
+	REMAP="anneal/init/"
+	# list of files that should be transfered to the execute node
+	TRANSFER_INPUT_FILES="sub/fortran/conH_init.f90, sub/fortran/polsqu2x2_mod.f90"
+	# list of files that should be transfered from the execute node
+	TRANSFER_OUTPUT_FILES=""
+	# list of remap instructions for each output file
+	TRANSFER_OUTPUT_REMAPS=""
+
+	## PARAMETERS - EXECUTION INSTRUCTIONS
+	# 
 
 
+	## ARGUMENTS
+	# none
+
+
+	## SCRIPT
+	# write submission script
+	echo "executable = ${EXEC_NAME}" > $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "should_transfer_files = YES" >> $SUB_PATH
+	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
+	echo "transfer_output_files = ${TRANSFER_OUTPUT_FILES}" >> $SUB_PATH
+	echo "transfer_output_remaps = ${TRANSFER_OUTPUT_REMAPS}" >> $SUB_PATH
+	echo "when_to_transfer_output = ON_SUCCESS" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "log = out/init.log" >> $SUB_PATH
+	echo "error = out/init.err" >> $SUB_PATH
+	echo "output = out/init.out" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "request_cpus = 1" >> $SUB_PATH
+	echo "request_disk = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
+	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "queue" >> $SUB_PATH
+
+	# write the execution scipt
+	echo "! #/bin/bash" > $EXEC_PATH
+	echo "set -e" >> $EXEC_PATH 
+	echo "" # compile module
+	echo "" # compile program
+	echo "" # link module and program
+	echo "" # execute 
+
+	# add node, pre- and post-script wrapper
+
+	echo "TODO :: establish conH initialization routine."
+	exit 0
 }
 
 ## OPTIONS
@@ -236,10 +310,23 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 			ANNEALID="${D2}${D3}${D4}"
 			SUBDAG="${ANNEALID}.spl"
 
-			# generate simulation files
-			gensim
+			# generate simulation directory and files
+			gensimdir
 
-			# add annealing simulation to subdag
+			# establish initialization node
+			genCHTCinit
+
+			exit 0
+
+			# establish rerun nodes
+			genCHTCrerun # add name of repeated function?
+
+			# establish anneal nodes
+			genCHTCanneal
+
+			# TODO :: establish analysis nodes
+
+			# add annealing simulation instructions to the subdag
 			echo "SPLICE ${ANNEALID} ${SUBDAG} DIR ${D}" >> $DAG
 
 			# increment density
