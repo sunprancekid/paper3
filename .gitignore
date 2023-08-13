@@ -2,6 +2,9 @@
 *.d
 *.DS_Store
 
+# CHTC Artifacts
+*.dag
+
 # Compiled Object files
 *.slo
 *.lo

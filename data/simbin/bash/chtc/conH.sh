@@ -119,15 +119,21 @@ gensim () {
 		done
 	fi
 
-	exit 0
-
+	# add / write files to the directory
 	# write the subdag to the directory
 
 	# write files to directory
-	# pre / post - script wrappers
 	# fortran files
-	# submission scripts
+	copy_fortran
+	# pre / post - script wrappers
+	write_wrappers
+	# write execute node execution script
+	write_execute
 
+	exit 0
+
+	# write submission scripts
+	# initialize the subdag
 	# add submission instructions to the subdag
 	# look for existing save files, if they have not been overwritten
 
