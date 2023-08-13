@@ -103,6 +103,10 @@ logical :: use_default_events = .true.
 real(kind=dbl), parameter :: default_frac = 0.95 
 ! fractional amount by which to reduce the temperarture 
 ! of the annealing simulation
+logical, parameter :: default_annealing_status = .false.
+! default annealing status used for simulation
+logical :: annealing_status = default_annealing_status
+! boolean that determines if annealing is turned on
 real(kind=dbl) :: anneal_frac = default_frac 
 logical :: use_default_frac = .true.
 
@@ -145,6 +149,7 @@ real(kind=dbl), parameter :: inbond = sigma1 - delta ! inner bond distance
 real(kind=dbl), parameter :: onbond = sigma1 + delta ! outer bond distance
 real(kind=dbl), parameter :: icbond = sqrt(2 * sigma1) - delta ! inner cross bond distance
 real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bond distance
+
 ! ** andersen thermostat *************************************
 ! assigned system temperature, used to initialize the velocity
 ! of simulation particles
@@ -160,6 +165,7 @@ real(kind=dbl) :: thermal_conductivity = 200.0 ! the thermal conductivity of the
 ! TODO :: adjust thermostat frequency calculations to per particle
 !   so that the frequency is constant across simulations of different sizes
 ! TODO :: add external field methods
+
 ! ** external field ******************************************
 logical :: field = .false. ! boolean controlling stochastic external field
 logical :: field_rotation = .false. ! boolean controlling field rotation, if field is on
@@ -1051,6 +1057,16 @@ subroutine set_external_field (status, strength, freq, force, ori)
         write (*,*) "set_external_field :: external field is off."
     endif
 end subroutine set_external_field
+
+subroutine set_annealing (status, frac)
+    implicit none 
+
+    ! if annealing is turned on
+    ! determine if any parameters have been passed to the method
+    ! if no parameters were passed to the method, attempt to load them
+    ! if no file exists, set the defaults
+
+end subroutine set_annealing
 
 ! ** type(id) functions **************************************
 
