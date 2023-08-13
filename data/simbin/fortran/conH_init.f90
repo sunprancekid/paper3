@@ -53,6 +53,7 @@ program conH_init
 
     ! initialize system
     call initialize_system(job = trim(args(1)), sim = trim(args(2)))
+    call initialize_annealing(status = .true., frac = annealing_fraction)
 
     ! save the status of the simulation after initialization
     call save()

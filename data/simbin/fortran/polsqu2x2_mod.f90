@@ -328,7 +328,7 @@ type(group), dimension(:), allocatable :: square ! square groupings plus ghost e
 real(kind=dbl) :: timenow ! current length of simulation 
 real(kind=dbl) :: timeperiod ! current length of period 
 real(kind=dbl) :: ghostrate ! frequency of ghost collision 
-real(kind=dbl) :: tempset ! current system temperature set point 
+real(kind=dbl) :: tempset = default_temperature ! current system temperature set point 
 integer :: n_events, n_col, n_ghost, n_thermostat, n_field, n_bond, n_hard, n_well ! event counting
 integer :: ghost ! downlist, uplist, and ghost event participants
 integer :: anneal ! number of times the simulation has reduced the temperature
@@ -362,7 +362,6 @@ type(node), dimension(:), allocatable :: eventTree ! binary tree list used for s
 integer :: rootnode ! pointer to first node of binary tree using for scheduling collision events
 real(kind=dbl) :: tsl, tl ! used for false positioning method: time since last update and time of last update
 ! ** andersen thermostat *************************************
-real(kind=dbl) :: temperature = default_temperature ! temperature set point of thermostat
 real(kind=dbl) :: thermostat_freq, thermostat_period
 type(event) :: thermostat_event ! thermostat ghost collision event 
 ! ** stochastic external field *******************************
@@ -477,12 +476,18 @@ function single_step () result (stop)
     ! TODO convert end of simulation calculation to mod function
     if (mod(n_events,total_events) == 0) then
         call close_files() 
-        anneal = anneal + 1 ! incriment the integer used to track the number of simulations which have been performed
-        !call adjust_temperature (tempset) ! set the temperature of the current simulation based on the temperature of the previous simulation
+        if (annealing_status) then 
+            ! if the annealing status is turned on
+            ! increment the annealing integer, which tracks how many times
+            ! the system temperature as been decrimented    
+            anneal = anneal + 1 
+            ! decriment the sytstem temperature 
+            call adjust_temperature (tempset) 
+        endif
         call update_positions()
         ! TODO: if the milestone has not been reached, add time to the current index
         call save () ! save the final state of the simulation 
-        call exit (CHECKPOINT_EXITCODE) ! if a boundary has not been reach, repeat the simulation
+        ! call exit (CHECKPOINT_EXITCODE) ! if a boundary has not been reach, repeat the simulation
     end if 
 end function single_step
 
@@ -680,7 +685,7 @@ function set_temperature (val) result (success)
         write (*,152) val, min_val, default_val
         success = .false.
     endif
-    temperature = val 
+    tempset = val 
     success = .true.
 end function set_temperature
 
@@ -828,7 +833,7 @@ subroutine set_thermostat (status, temp, freq)
         if (set_temperature(temp)) then 
             use_default_temperature = .false.
             1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
-            write (*,1) temperature
+            write (*,1) tempset
         endif
     endif
 
@@ -930,14 +935,14 @@ subroutine set_external_field (status, strength, freq, force, ori)
                 write (*, 1) field_impulse
             else
                 ! assign the default
-                field_impulse = sqrt(2. * temperature)
+                field_impulse = sqrt(2. * tempset)
                 ! inform the user
                 write (*, 2) field_impulse
             endif
         else
             ! force not assigned or value passed to method not allowable
             ! assign the default 
-            field_impulse = sqrt(2. * temperature)
+            field_impulse = sqrt(2. * tempset)
             write (*, 2) field_impulse
         endif 
 
@@ -1057,16 +1062,6 @@ subroutine set_external_field (status, strength, freq, force, ori)
         write (*,*) "set_external_field :: external field is off."
     endif
 end subroutine set_external_field
-
-subroutine set_annealing (status, frac)
-    implicit none 
-
-    ! if annealing is turned on
-    ! determine if any parameters have been passed to the method
-    ! if no parameters were passed to the method, attempt to load them
-    ! if no file exists, set the defaults
-
-end subroutine set_annealing
 
 ! ** type(id) functions **************************************
 
@@ -1261,11 +1256,59 @@ subroutine adjust_temperature(temp)
             ' below the allowable amount. Annealing simulation has ended.'
         call exit ()
     end if 
-    call random_velocity(0., sqrt(temp))
+    ! call random_velocity(0., sqrt(temp))
     call complete_reschedule()
 end subroutine adjust_temperature
 
 ! // anneal status //
+
+subroutine initialize_annealing (status, frac)
+    implicit none 
+    logical, intent(in), optional :: status 
+    ! boolean that determines if annealing status should be turned on or off
+    real, intent(in), optional :: frac
+    ! real number between one and zero that determines the fraction by
+    ! which the temperarture is reduced each iteration of the annealing simulation
+
+    ! string formatting statements
+    1 format (" set_annealing_status :: annealing fraction set to ", F8.3,".")
+    2 format (" set_annealing_status :: unable to assign the annealing fraction value ", &
+        "passed to the method. value (", F8.3,") is less than zero or greater than zero.")
+    3 format (" set_annealing_status :: default annealing fraction assigned (", F8.3,")")
+
+    ! assign the annealing status passed to the argument
+    if (present(status)) then 
+        if (status) then 
+            annealing_status = .true. 
+            write (*,*) "set_annealing_status :: the annealing status was turned on."
+            ! if the annealing status is being turned on
+            anneal = 0 ! initialize the annealing integer
+        else
+            annealing_status = .false.
+            write (*,*) "set_annealing_status :: the annealing status was turned off."
+        endif
+    endif
+
+    ! if annealing is turned on
+    if (status) then 
+        if (present(frac)) then 
+            ! check that the value is acceptable, then assign the value
+            if (frac > 0. .and. frac < 1.) then 
+                anneal_frac = frac
+                write (*,1) frac 
+            else
+                ! the value is outside the valid range
+                write (*,2) frac 
+                anneal_frac = default_frac
+                write(*,3) anneal_frac
+            endif
+        else
+            ! if the fraction is not present, assign the default
+            anneal_frac = default_frac
+            write (*,3) anneal_frac
+        endif
+    endif
+end subroutine initialize_annealing
 
 subroutine set_annealstatus()
     implicit none
@@ -1276,12 +1319,18 @@ subroutine set_annealstatus()
     ! load the state of the annealing simulation
     open (unit = saveiounit, file = trim(anneal_savefile), status = 'OLD', action = 'READ', iostat = ierror)
     if (ierror == 0) then ! read the information in from the save file 
-        read (saveiounit, *) anneal 
-        read (saveiounit, *) tempset 
+        read (saveiounit, *) annealing_status
+        if (annealing_status) then 
+            ! if the annealing status is turned on, continue reading the file
+            read (saveiounit, *) anneal 
+            read (saveiounit, *) anneal_frac
+            ! read (saveiounit, *) tempset 
+        endif
         close (unit = saveiounit, status = 'KEEP')
-    else ! if not save status for the anneal simulation exists, start the simulation from the beginning 
-        anneal = 0
-        tempset = temperature
+    else 
+        ! if a file containing the annealing status does not exist
+        ! assume that the annealing status is off
+        annealing_status = .false.
     end if 
 end subroutine set_annealstatus
 
@@ -1294,8 +1343,10 @@ subroutine save_annealstatus()
     ! save the status of the annealing simulation
     open (unit = saveiounit, file = trim(anneal_savefile), status = 'REPLACE', action = 'WRITE', iostat = ierror)
     if (ierror == 0) then 
+        write (saveiounit, *) annealing_status
         write (saveiounit, *) anneal
-        write (saveiounit, *) tempset
+        write (saveiounit, *) anneal_frac
+        ! write (saveiounit, *) tempset 
     else
         write (simiounit, *) 'save_state: unable to open annealsavefile. failed to record annealing simulation status'
     end if
@@ -2164,7 +2215,7 @@ subroutine open_files ()
     ! save file containing chiraliry description of each grouping
     sim_savefile = trim(jobid) // trim(simid) // '__simSAVE.dat' 
     ! save file containing all simulation state 
-    anneal_savefile = trim(jobid) // trim(simid) // '__annSAVE.dat' 
+    anneal_savefile = trim(jobid) // trim(simid) // '__annealSAVE.dat' 
     ! save file containing the status of the annealing simulation
     ms_savefile = trim(jobid) // trim(simid) // '__milestoneSAVE.dat' 
     ! save file containing parameters for milestoning
