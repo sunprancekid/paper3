@@ -72,7 +72,25 @@ gensimdir () {
 	# list of sub directories to generate inside the main directory
 	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" "anneal/tmp" )
 	# list of fortran files that should be copied to the simulation directory
-	FORTRAN_FILES=( "conH_init.f90" "conH_anneal.f90" "polsqu2x2_mod.f90" )
+	FORTRAN_FILES=( "conH.f90" "polsqu2x2_mod.f90" )
+	# name of the executable file
+	EXEC_NAME="sub/exec/conH.sh"
+	# name of the executable
+	EXEC_PATH="${D}${EXEC_NAME}"
+
+	## PARAMETERS - SIMULATION VARIABLES
+	# area fraction value
+	local AF_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ETA} / 100 }"))
+	# cell size value - related to the number of particles in the simulation
+	local CELL_VAL=${CELL}
+	# a-chirality square number fraction
+	local ACHAI_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ACHAI} / 100 }"))
+	# external field value
+	local FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
+	# inital temperature assigned to simulation
+	local INIT_TEMP=$ANNEAL_TEMP
+	# annealing fraction of simulation
+	local ANNEAL_FRAC=$(printf '%3.2f' $(awk "BEGIN { print ${FRAC} / 100 }"))
 
 
 	## ARGUMENTS
@@ -123,18 +141,27 @@ gensimdir () {
 		done
 	fi
 
-	# add / write files to the directory
-	# write the subdag to the directory
-
-	# write files to directory
-	# fortran files
+	## add / write files to the directory
+	# copy fortran files to the directory
 	for ff in ${FORTRAN_FILES[@]}; do
 		# copy each fortran file from the fortran bin to the simulation directory fortan repo
 		cp "./simbin/fortran/${ff}" "${D}sub/fortran/"
 	done
-	# pre / post - script wrappers for annealing simulations
+	# copy pre / post - script wrappers for annealing simulations
 	cp ./simbin/bash/chtc/anneal_wrappers/* "${D}"
-	# TODO :: add execution status to each script
+
+	# write the executable to the simulation directory
+	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
+	echo "set -e" >> $EXEC_PATH  # catch errors! 
+	# compile module and program
+	echo "gfortran -O -c polsqu2x2_mod.f90 conH.f90" >> $EXEC_PATH 
+	# link module and program
+	echo "gfortran -o conH_init.ex conH.o polsqu2x2_mod.o" >> $EXEC_PATH 
+	# execute with arguments, first argument is the execute code
+	echo "./conH.ex \$1 ${JOBID} ${ANNEALID} ${AF_VAL} ${CELL_VAL} ${ACHAI_VAL} ${FIELD_VAL} ${INIT_TEMP} ${EVENTS} ${ANNEAL_FRAC}"  >> $EXEC_PATH 
+	# add execution capabilities to script
+	chmod u+x $EXEC_PATH
+
 	# initialize the subdag
 	SUBDAG_PATH="${D}${SUBDAG}"
 	if [[ -f "$SUBDAG_PATH" ]]; then 
@@ -151,73 +178,55 @@ genCHTCinit() {
 
 	## PARAMETERS
 	# name of file containing submission instructions
-	SUB_NAME="sub/init.sub"
+	local SUB_NAME="sub/init.sub"
 	# path to file containing submission instructions
-	SUB_PATH="${D}${SUB_NAME}"
-	# name of the executable file
-	EXEC_NAME="sub/exec/conH_init.sh"
-	# name of the executable
-	EXEC_PATH="${D}${EXEC_NAME}"
+	local SUB_PATH="${D}${SUB_NAME}"
 	# id for the simulation that the initialization node is being generated for
-	SIM_ID="${JOBID}${ANNEALID}"
-
-	## PARAMETERS - SIMULATION VARIABLES
-	# area fraction value
-	AF_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ETA} / 100 }"))
-	# cell size value - related to the number of particles in the simulation
-	CELL_VAL=${CELL}
-	# a-chirality square number fraction
-	ACHAI_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ACHAI} / 100 }"))
-	# external field value
-	FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
-	# inital temperature assigned to simulation
-	INIT_TEMP=$ANNEAL_TEMP
-	# annealing fraction of simulation
-	ANNEAL_FRAC=$(printf '%3.2f' $(awk "BEGIN { print ${FRAC} / 100 }"))
+	local SIM_ID="${JOBID}${ANNEALID}"
 
 	## PARAMETERS - FILES
 	# movie file
-	SIM_MOV="${SIM_ID}_squmov.xyz"
+	local SIM_MOV="${SIM_ID}_squmov.xyz"
 	# text file
-	SIM_TXT="${SIM_ID}.txt"
+	local SIM_TXT="${SIM_ID}.txt"
 	# anneal file
-	SIM_ANN="${SIM_ID}_anneal.csv"
+	local SIM_ANN="${SIM_ID}_anneal.csv"
 	# annealing save file
-	SIM_ANN_SAVE="${SIM_ID}__annealSAVE.dat"
+	local SIM_ANN_SAVE="${SIM_ID}__annealSAVE.dat"
 	# chirality save file
-	SIM_CHAI_SAVE="${SIM_ID}__chaiSAVE.dat"
+	local SIM_CHAI_SAVE="${SIM_ID}__chaiSAVE.dat"
 	# false position save file
-	SIM_FPOS_SAVE="${SIM_ID}__fposSAVE.dat"
+	local SIM_FPOS_SAVE="${SIM_ID}__fposSAVE.dat"
 	# velocity save file
-	SIM_VEL_SAVE="${SIM_ID}__velSAVE.dat"
+	local SIM_VEL_SAVE="${SIM_ID}__velSAVE.dat"
 	# simulation setting sim file
-	SIM_SIM_SAVE="${SIM_ID}__simSAVE.dat"
+	local SIM_SIM_SAVE="${SIM_ID}__simSAVE.dat"
 
 	## PARAMETERS - SUBMISSION INTRUCTIONS
 	# memory to request
-	REQUEST_MEMORY="500MB"
+	local REQUEST_MEMORY="500MB"
 	# disk space to request
-	REQUEST_DISK="1GB"
+	local REQUEST_DISK="1GB"
 	# directory that output files are remapped to
-	REMAP="anneal/init/"
+	local REMAP="anneal/init/"
 	# list of files with remapping instructions
-	RMP_SIM_MOV="${SIM_MOV}=${REMAP}${SIM_MOV}"
-	RMP_SIM_TXT="${SIM_TXT}=${REMAP}${SIM_TXT}"
-	RMP_SIM_ANN="${SIM_ANN}=${REMAP}${SIM_ANN}"
-	RMP_SIM_ANN_SAVE="${SIM_ANN_SAVE}=${REMAP}${SIM_ANN_SAVE}"
-	RMP_SIM_CHAI_SAVE="${SIM_CHAI_SAVE}=${REMAP}${SIM_CHAI_SAVE}"
-	RMP_SIM_FPOS_SAVE="${SIM_FPOS_SAVE}=${REMAP}${SIM_FPOS_SAVE}"
-	RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
-	RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP}${SIM_SIM_SAVE}"
+	local RMP_SIM_MOV="${SIM_MOV}=${REMAP}${SIM_MOV}"
+	local RMP_SIM_TXT="${SIM_TXT}=${REMAP}${SIM_TXT}"
+	local RMP_SIM_ANN="${SIM_ANN}=${REMAP}${SIM_ANN}"
+	local RMP_SIM_ANN_SAVE="${SIM_ANN_SAVE}=${REMAP}${SIM_ANN_SAVE}"
+	local RMP_SIM_CHAI_SAVE="${SIM_CHAI_SAVE}=${REMAP}${SIM_CHAI_SAVE}"
+	local RMP_SIM_FPOS_SAVE="${SIM_FPOS_SAVE}=${REMAP}${SIM_FPOS_SAVE}"
+	local RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
+	local RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP}${SIM_SIM_SAVE}"
 	# list of files that should be transfered to the execute node
-	TRANSFER_INPUT_FILES="sub/fortran/conH_init.f90, sub/fortran/polsqu2x2_mod.f90"
+	local TRANSFER_INPUT_FILES="sub/fortran/conH_init.f90, sub/fortran/polsqu2x2_mod.f90"
 	# list of files that should be transfered from the execute node
-	TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
+	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
-	TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
+	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 	## PARAMETERS - EXECUTION INSTRUCTIONS
-	# 
+	# none
 
 
 	## ARGUMENTS
@@ -232,6 +241,7 @@ genCHTCinit() {
 
 	# write submission script
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
+	echo "arguments = 0" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
@@ -252,22 +262,99 @@ genCHTCinit() {
 	echo "" >> $SUB_PATH
 	echo "queue" >> $SUB_PATH
 
-	# write the execution scipt
-	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
-	echo "set -e" >> $EXEC_PATH  # catch errors! 
-	# compile module and program
-	echo "gfortran -O -c polsqu2x2_mod.f90 conH_init.f90" >> $EXEC_PATH 
-	# link module and program
-	echo "gfortran -o conH_init.ex conH_init.o polsqu2x2_mod.o" >> $EXEC_PATH 
-	# execute with arguments
-	echo "./conH_init.ex ${JOBID} ${ANNEALID} ${AF_VAL} ${CELL_VAL} ${ACHAI_VAL} ${FIELD_VAL} ${INIT_TEMP} ${EVENTS} ${ANNEAL_FRAC}"  >> $EXEC_PATH 
-	# add execution capabilities to script
-	chmod u+x $EXEC_PATH
-
 	# add node, pre- and post-script wrapper
 	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
+}
+
+# script for generating annealing nodes
+# the annealing node accepts the save files from the previous
+# annealing simulation, and uses them to continue the annealing 
+# simulation from the place the it stopped according to the save files
+genCHTCanneal() {
+
+	## PARAMETERS
+	# name of file containing submission instructions
+	local SUB_NAME="sub/anneal.sub"
+	# path to file containing submission instructions
+	local SUB_PATH="${D}${SUB_NAME}"
+	# name of the executable file
+	local EXEC_NAME="sub/exec/conH_anneal.sh"
+	# name of the executable
+	local EXEC_PATH="${D}${EXEC_NAME}"
+	# id for the simulation that the initialization node is being generated for
+	local SIM_ID="${JOBID}${ANNEALID}"
+
+	## PARAMETERS - SIMULATION VARIABLES
+	# area fraction value
+	local AF_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ETA} / 100 }"))
+	# cell size value - related to the number of particles in the simulation
+	local CELL_VAL=${CELL}
+	# a-chirality square number fraction
+	local ACHAI_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ACHAI} / 100 }"))
+	# external field value
+	local FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
+	# inital temperature assigned to simulation
+	local INIT_TEMP=$ANNEAL_TEMP
+	# annealing fraction of simulation
+	local ANNEAL_FRAC=$(printf '%3.2f' $(awk "BEGIN { print ${FRAC} / 100 }"))
+
+	## PARAMETERS - FILES
+	# movie file
+	local SIM_MOV="${SIM_ID}_squmov.xyz"
+	# text file
+	local SIM_TXT="${SIM_ID}.txt"
+	# anneal file
+	local SIM_ANN="${SIM_ID}_anneal.csv"
+	# annealing save file
+	local SIM_ANN_SAVE="${SIM_ID}__annealSAVE.dat"
+	# chirality save file
+	local SIM_CHAI_SAVE="${SIM_ID}__chaiSAVE.dat"
+	# false position save file
+	local SIM_FPOS_SAVE="${SIM_ID}__fposSAVE.dat"
+	# velocity save file
+	local SIM_VEL_SAVE="${SIM_ID}__velSAVE.dat"
+	# simulation setting sim file
+	local SIM_SIM_SAVE="${SIM_ID}__simSAVE.dat"
+
+	## PARAMETERS - MAPPING TO INPUT FILES
+	# memory to request
+	local REQUEST_MEMORY="500MB"
+	# disk space to request
+	local REQUEST_DISK="1GB"
+	# directory that output files are remapped to
+	local REMAP="anneal/tmp/"
+	# list of files with path to the input directory
+	local INPT_SIM_ANN_SAVE="${REMAP}${SIM_ANN_SAVE}"
+	local INPT_SIM_CHAI_SAVE="${REMAP}${SIM_CHAI_SAVE}"
+	local INPT_SIM_FPOS_SAVE="${REMAP}${SIM_FPOS_SAVE}"
+	local INPT_SIM_VEL_SAVE="${REMAP}${SIM_VEL_SAVE}"
+	local INPT_SIM_SIM_SAVE="${REMAP}${SIM_SIM_SAVE}"
+	# list of files with remapping instructions
+	local RMP_SIM_MOV="${SIM_MOV}=${REMAP}${SIM_MOV}"
+	local RMP_SIM_TXT="${SIM_TXT}=${REMAP}${SIM_TXT}"
+	local RMP_SIM_ANN="${SIM_ANN}=${REMAP}${SIM_ANN}"
+	local RMP_SIM_ANN_SAVE="${SIM_ANN_SAVE}=${REMAP}${SIM_ANN_SAVE}"
+	local RMP_SIM_CHAI_SAVE="${SIM_CHAI_SAVE}=${REMAP}${SIM_CHAI_SAVE}"
+	local RMP_SIM_FPOS_SAVE="${SIM_FPOS_SAVE}=${REMAP}${SIM_FPOS_SAVE}"
+	local RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
+	local RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP}${SIM_SIM_SAVE}"
+	# list of files that should be transfered to the execute node
+	local TRANSFER_INPUT_FILES="sub/fortran/conH_anneal.f90, sub/fortran/polsqu2x2_mod.f90, ${INPT_SIM_ANN_SAVE}, ${INPT_SIM_SIM_SAVE}, ${INPT_SIM_VEL_SAVE}, ${INPT_SIM_CHAI_SAVE}, ${INPT_SIM_FPOS_SAVE}"
+	# list of files that should be transfered from the execute node
+	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
+	# list of remap instructions for each output file
+	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
+
+
+
+	## ARGUMENTS
+	# none
+
+	## SCRIPT
+	# none
+
 }
 
 ## OPTIONS

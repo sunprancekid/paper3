@@ -22,11 +22,11 @@ declare -i COUNT_BOOL=0
 # flags are used for specifying exit criteria 
 while getopts "ib:n:" option; do
     case $option in
-    	i) # initial simulation
+    	i) # flag for how the script should hanle the initial simulation
 			
 			# boolean determining if the script if performing operations
 			# for the initial annealing node
-			declare -i BOOL_INIT=1
+			declare -i BOOL_INIT=1 ;;
 		\?) # default
 			echo "must declare arguments" ;;
    esac
