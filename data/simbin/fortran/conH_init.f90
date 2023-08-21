@@ -7,7 +7,7 @@ program conH_init
     implicit none
     integer, parameter :: N_ARGS = 9 ! number of arguments accepted by simulation file
     integer :: a  ! number of arguments determined by program
-    character(len=12), dimension(:), allocatable :: args
+    character(len=20), dimension(:), allocatable :: args
     ! arguments to parse from the command line
     ! first argument is the job title
     ! seconds argument is the annealing id

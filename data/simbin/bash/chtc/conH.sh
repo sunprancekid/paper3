@@ -35,7 +35,7 @@ declare -i ETA_MAX=60
 # integer amount to increment density by between maximum and minimum
 declare -i ETA_INC=5
 # minimum fraction of a-chirality squares used in simulations
-declare -i ACHAI_MIN=50
+declare -i ACHAI_MIN=100
 # maximum fraction of a-chirality squares used in simulations
 declare -i ACHAI_MAX=100
 # integer amount to increment fraction of a-chirality squares by
@@ -70,7 +70,7 @@ gensimdir () {
 
 	## PARAMETERS
 	# list of sub directories to generate inside the main directory
-	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" "anneal/tmp" "anneal/save" "anneal/mov" "anneal/prop" "anneal/txt" )
+	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" "anneal/tmp" )
 	# list of fortran files that should be copied to the simulation directory
 	FORTRAN_FILES=( "conH_init.f90" "conH_anneal.f90" "polsqu2x2_mod.f90" )
 
@@ -136,10 +136,10 @@ gensimdir () {
 	cp ./simbin/bash/chtc/anneal_wrappers/* "${D}"
 	# TODO :: add execution status to each script
 	# initialize the subdag
-	SUBDAG="${D}${SUBDAG}"
-	if [[ -f "$SUBDAG" ]]; then 
+	SUBDAG_PATH="${D}${SUBDAG}"
+	if [[ -f "$SUBDAG_PATH" ]]; then 
 		# if the file exists, remove it
-		rm "$SUBDAG"
+		rm "$SUBDAG_PATH"
 	fi
 }
 
@@ -150,8 +150,10 @@ gensimdir () {
 genCHTCinit() {
 
 	## PARAMETERS
-	# path to submission instructions
-	SUB_PATH="${D}sub/init.sub"
+	# name of file containing submission instructions
+	SUB_NAME="sub/init.sub"
+	# path to file containing submission instructions
+	SUB_PATH="${D}${SUB_NAME}"
 	# name of the executable file
 	EXEC_NAME="sub/exec/conH_init.sh"
 	# name of the executable
@@ -223,6 +225,11 @@ genCHTCinit() {
 
 
 	## SCRIPT
+	# if verbose, inform the user
+	if [[ VERB_BOOL -eq 1 ]]; then 
+		echo "Establishing initialization node for annealing simulation (${ANNEALID})."
+	fi
+
 	# write submission script
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
 	echo "" >> $SUB_PATH
@@ -258,9 +265,9 @@ genCHTCinit() {
 	chmod u+x $EXEC_PATH
 
 	# add node, pre- and post-script wrapper
-	echo "SCRIPT PRE ${ANNEALID}_init prescript_wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG
-	echo "JOB ${ANNEALID}_init ${SUB_PATH}" >> $SUBDAG
-	echo "SCRIPT POST ${ANNEALID}_init postscript_wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG
+	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
+	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_init postscrip-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
 }
 
 ## OPTIONS
@@ -320,7 +327,7 @@ D1=${SIM_MOD}_c${CELL}
 # establish DAGMAN files
 JOBID="${JOB}_${SIM_MOD}"
 DAG="${JOBID}.dag"
-if [[ -f DAG ]]; then
+if [[ -f "${DAG}" ]]; then
 	# if the file exists, remove it
 	rm $DAG
 fi
@@ -353,7 +360,7 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 			D4="e${ETA_STRING}"
 
 			# establish directory path
-			D="./${D0}/${D1}/${D2}/${D3}/${D4}/"
+			D="${D0}/${D1}/${D2}/${D3}/${D4}/"
 
 			# establish annealing simulation id
 			ANNEALID="${D2}${D3}${D4}"
@@ -389,6 +396,6 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 done
 
 # submit job to CHTC
-condor_submit_dag -maxidle 1000 -batch-name "${JOBID}" ${DAG} > ${JOBID}_dagsub.out
+condor_submit_dag -batch-name "${JOBID}" ${DAG} > ${JOBID}_dagsub.out
 sleep 10
 condor_watch_q

@@ -68,5 +68,7 @@ if [[ BOOL_LOADINIT -eq 1 ]]; then
 
 	# inform the user
 	echo "${CURRENTTIME}: Generating save directories for initial node."
+
+	exit 0
 fi
 
