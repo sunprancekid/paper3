@@ -20,6 +20,8 @@ JOB="conH"
 SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
 declare -i CELL=12
+# starting temperature of annealing simulation
+ANNEAL_TEMP="3.0"
 # minimum field strength used for simulations
 declare -i FIELD_MIN=0
 # maximum field strength used for simulations
@@ -68,7 +70,7 @@ gensimdir () {
 
 	## PARAMETERS
 	# list of sub directories to generate inside the main directory
-	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" "anneal/tmp" )
+	SUBDIR=( "anneal" "out" "sub" "sub/exec" "sub/fortran" "anal" "anneal/tmp" "anneal/save" "anneal/mov" "anneal/prop" "anneal/txt" )
 	# list of fortran files that should be copied to the simulation directory
 	FORTRAN_FILES=( "conH_init.f90" "conH_anneal.f90" "polsqu2x2_mod.f90" )
 
@@ -155,7 +157,21 @@ genCHTCinit() {
 	# name of the executable
 	EXEC_PATH="${D}${EXEC_NAME}"
 	# id for the simulation that the initialization node is being generated for
-	SIM_ID="${D}${ANNEALID}"
+	SIM_ID="${JOBID}${ANNEALID}"
+
+	## PARAMETERS - SIMULATION VARIABLES
+	# area fraction value
+	AF_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ETA} / 100 }"))
+	# cell size value - related to the number of particles in the simulation
+	CELL_VAL=${CELL}
+	# a-chirality square number fraction
+	ACHAI_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ACHAI} / 100 }"))
+	# external field value
+	FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
+	# inital temperature assigned to simulation
+	INIT_TEMP=$ANNEAL_TEMP
+	# annealing fraction of simulation
+	ANNEAL_FRAC=$(printf '%3.2f' $(awk "BEGIN { print ${FRAC} / 100 }"))
 
 	## PARAMETERS - FILES
 	# movie file
@@ -230,17 +246,21 @@ genCHTCinit() {
 	echo "queue" >> $SUB_PATH
 
 	# write the execution scipt
-	echo "! #/bin/bash" > $EXEC_PATH
-	echo "set -e" >> $EXEC_PATH 
-	echo "" # compile module
-	echo "" # compile program
-	echo "" # link module and program
-	echo "" # execute 
+	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
+	echo "set -e" >> $EXEC_PATH  # catch errors! 
+	# compile module and program
+	echo "gfortran -O -c polsqu2x2_mod.f90 conH_init.f90" >> $EXEC_PATH 
+	# link module and program
+	echo "gfortran -o conH_init.ex conH_init.o polsqu2x2_mod.o" >> $EXEC_PATH 
+	# execute with arguments
+	echo "./conH_init.ex ${JOBID} ${ANNEALID} ${AF_VAL} ${CELL_VAL} ${ACHAI_VAL} ${FIELD_VAL} ${INIT_TEMP} ${EVENTS} ${ANNEAL_FRAC}"  >> $EXEC_PATH 
+	# add execution capabilities to script
+	chmod u+x $EXEC_PATH
 
 	# add node, pre- and post-script wrapper
-
-	echo "TODO :: establish conH initialization routine."
-	exit 0
+	echo "SCRIPT PRE ${ANNEALID}_init prescript_wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG
+	echo "JOB ${ANNEALID}_init ${SUB_PATH}" >> $SUBDAG
+	echo "SCRIPT POST ${ANNEALID}_init postscript_wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG
 }
 
 ## OPTIONS
@@ -345,13 +365,11 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 			# establish initialization node
 			genCHTCinit
 
-			exit 0
-
 			# establish rerun nodes
-			genCHTCrerun # add name of repeated function?
+			# genCHTCrerun # add name of repeated function?
 
-			# establish anneal nodes
-			genCHTCanneal
+			# establish the final anneal node
+			# genCHTCanneal
 
 			# TODO :: establish analysis nodes
 
@@ -370,3 +388,7 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 ((ACHAI+=ACHAI_INC))
 done
 
+# submit job to CHTC
+condor_submit_dag -maxidle 1000 -batch-name "${JOBID}" ${DAG} > ${JOBID}_dagsub.out
+sleep 10
+condor_watch_q
