@@ -208,7 +208,7 @@ genCHTCinit() {
 	RMP_SIM_CHAI_SAVE="${SIM_CHAI_SAVE}=${REMAP}${SIM_CHAI_SAVE}"
 	RMP_SIM_FPOS_SAVE="${SIM_FPOS_SAVE}=${REMAP}${SIM_FPOS_SAVE}"
 	RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
-	RMP_SIM_SIM_SAVE="${SIM_ANN_SAVE}=${REMAP}${SIM_ANN_SAVE}"
+	RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP}${SIM_SIM_SAVE}"
 	# list of files that should be transfered to the execute node
 	TRANSFER_INPUT_FILES="sub/fortran/conH_init.f90, sub/fortran/polsqu2x2_mod.f90"
 	# list of files that should be transfered from the execute node
@@ -267,7 +267,7 @@ genCHTCinit() {
 	# add node, pre- and post-script wrapper
 	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST ${ANNEALID}_init postscrip-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
 }
 
 ## OPTIONS
