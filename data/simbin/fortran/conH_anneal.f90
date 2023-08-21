@@ -47,7 +47,13 @@ program conH_init
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1000.)
     call set_thermostat (status = .true., freq = 0.1)
-    call set_external_field (status = .true., strength = field_strength)
+    if (.not. (field_strength > 0.)) then
+        ! if the field strength is not greater than zero, turn the field off
+        call set_external_field (status = .false.)
+    else
+        ! else turn the field on and assign the field strength value passed to the program
+        call set_external_field (status = .true., strength = field_strength)
+    endif
 
     ! initialize system
     call initialize_system(job = trim(args(1)), sim = trim(args(2)))
