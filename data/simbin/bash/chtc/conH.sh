@@ -156,7 +156,7 @@ gensimdir () {
 	# compile module and program
 	echo "gfortran -O -c polsqu2x2_mod.f90 conH.f90" >> $EXEC_PATH 
 	# link module and program
-	echo "gfortran -o conH_init.ex conH.o polsqu2x2_mod.o" >> $EXEC_PATH 
+	echo "gfortran -o conH.ex conH.o polsqu2x2_mod.o" >> $EXEC_PATH 
 	# execute with arguments, first argument is the execute code
 	echo "./conH.ex \$1 ${JOBID} ${ANNEALID} ${AF_VAL} ${CELL_VAL} ${ACHAI_VAL} ${FIELD_VAL} ${INIT_TEMP} ${EVENTS} ${ANNEAL_FRAC}"  >> $EXEC_PATH 
 	# add execution capabilities to script
@@ -219,7 +219,7 @@ genCHTCinit() {
 	local RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
 	local RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP}${SIM_SIM_SAVE}"
 	# list of files that should be transfered to the execute node
-	local TRANSFER_INPUT_FILES="sub/fortran/conH_init.f90, sub/fortran/polsqu2x2_mod.f90"
+	local TRANSFER_INPUT_FILES="sub/fortran/conH.f90, sub/fortran/polsqu2x2_mod.f90"
 	# list of files that should be transfered from the execute node
 	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
@@ -263,9 +263,9 @@ genCHTCinit() {
 	echo "queue" >> $SUB_PATH
 
 	# add node, pre- and post-script wrapper
-	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
-	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST ${ANNEALID}_init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
+	echo "JOB init ${SUB_NAME}" >> $SUBDAG_PATH
+	echo "SCRIPT PRE init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes
@@ -285,20 +285,6 @@ genCHTCanneal() {
 	local EXEC_PATH="${D}${EXEC_NAME}"
 	# id for the simulation that the initialization node is being generated for
 	local SIM_ID="${JOBID}${ANNEALID}"
-
-	## PARAMETERS - SIMULATION VARIABLES
-	# area fraction value
-	local AF_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ETA} / 100 }"))
-	# cell size value - related to the number of particles in the simulation
-	local CELL_VAL=${CELL}
-	# a-chirality square number fraction
-	local ACHAI_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ACHAI} / 100 }"))
-	# external field value
-	local FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
-	# inital temperature assigned to simulation
-	local INIT_TEMP=$ANNEAL_TEMP
-	# annealing fraction of simulation
-	local ANNEAL_FRAC=$(printf '%3.2f' $(awk "BEGIN { print ${FRAC} / 100 }"))
 
 	## PARAMETERS - FILES
 	# movie file
@@ -341,19 +327,49 @@ genCHTCanneal() {
 	local RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP}${SIM_VEL_SAVE}"
 	local RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP}${SIM_SIM_SAVE}"
 	# list of files that should be transfered to the execute node
-	local TRANSFER_INPUT_FILES="sub/fortran/conH_anneal.f90, sub/fortran/polsqu2x2_mod.f90, ${INPT_SIM_ANN_SAVE}, ${INPT_SIM_SIM_SAVE}, ${INPT_SIM_VEL_SAVE}, ${INPT_SIM_CHAI_SAVE}, ${INPT_SIM_FPOS_SAVE}"
+	local TRANSFER_INPUT_FILES="sub/fortran/conH.f90, sub/fortran/polsqu2x2_mod.f90, ${INPT_SIM_ANN_SAVE}, ${INPT_SIM_SIM_SAVE}, ${INPT_SIM_VEL_SAVE}, ${INPT_SIM_CHAI_SAVE}, ${INPT_SIM_FPOS_SAVE}"
 	# list of files that should be transfered from the execute node
 	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
 	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 
-
 	## ARGUMENTS
 	# none
 
 	## SCRIPT
-	# none
+	# if verbose, inform the user
+	if [[ VERB_BOOL -eq 1 ]]; then 
+		echo "Establishing looping anneal node for annealing simulation (${ANNEALID})."
+	fi
+
+	# write submission script
+	echo "executable = ${EXEC_NAME}" > $SUB_PATH
+	echo "arguments = 0" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "should_transfer_files = YES" >> $SUB_PATH
+	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
+	echo "transfer_output_files = ${TRANSFER_OUTPUT_FILES}" >> $SUB_PATH
+	echo "transfer_output_remaps = \"${TRANSFER_OUTPUT_REMAPS}\"" >> $SUB_PATH
+	echo "when_to_transfer_output = ON_SUCCESS" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "log = out/init.log" >> $SUB_PATH
+	echo "error = out/init.err" >> $SUB_PATH
+	echo "output = out/init.out" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "request_cpus = 1" >> $SUB_PATH
+	echo "request_disk = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
+	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "queue" >> $SUB_PATH
+
+	# add node, pre- and post-script wrapper
+	echo "JOB anneal ${SUB_NAME}" >> $SUBDAG_PATH
+	echo "SCRIPT PRE anneal prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST anneal postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
 
 }
 
