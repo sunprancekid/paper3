@@ -19,16 +19,16 @@ declare -i BOOL_LOADINIT=0
 
 ## OPTIONS
 # parse options
-while getopts "il" option
+while getopts "ial" option
 do 
 	case $option in 
 		i) # load the initial state 
 			
 			# boolean that determines if the inital state should be loaded
 			declare -i BOOL_LOADINIT=1;;
-		l) # load the last save 
-
-			# boolean that determines if the last state should be loaded
+		a) # load the previous state from the annealing loop
+			
+			# boolean that determines if the previous annealing state should be loaded
 			declare -i BOOL_LOADLAST=1;;
 		\?) # default
 			echo "Invalid option declared." >> "${OUTNAME}" 2>&1;;

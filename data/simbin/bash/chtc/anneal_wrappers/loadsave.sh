@@ -15,6 +15,9 @@ CURRENTTIME=$(date '+%Y-%m-%d %H:%M:%S')
 declare -i NONZERO_EXITCODE=1
 # array containing a list of SAVE files
 SAVE=( "fposSAVE" "velSAVE" "chaiSAVE" "annSAVE" "simSAVE" )
+# temp file used to store information about saving and loading
+# annealing simulations between pre- and post-processing scripts
+TMP_FILE="./anneal/tmp/next_dir.txt"
 # boolean determining if initial simulation save data should be loaded
 declare -i BOOL_LOADINIT=0
 # boolean determining if last save should be loaded
@@ -70,5 +73,20 @@ if [[ BOOL_LOADINIT -eq 1 ]]; then
 	echo "${CURRENTTIME}: Generating save directories for initial node."
 
 	exit 0
+elif [[ BOOL_LOADLAST -eq 1 ]]; then
+	# if loading the previous state of an annealing simulation
+	# get the directory that contains the previous state from the temporary file
+	NXT_DIR=$( head -n 1 $TMP_FILE | tail -n 1 )
+
+	# copy each save file from the save directory, to the tmp directory
+	for s in ${SAVE[@]}; do
+		cp "./anneal/${NXT_DIR}/${JOB}${SAVE}__${s}" "./anneal/tmp/"
+	done
+
+	# inform the user
+	echo "${CURRENTTIME}: Copying save files from ./anneal/${NXT_DIR} to ./anneal/tmp/."
+
+	exit 0
+
 fi
 

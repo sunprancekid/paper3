@@ -67,7 +67,7 @@ polsqu_conH_anneal:
 	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(CONH_SIM).f90
 	# link module and program
 	$(FORT) -o $(CONH_SIM).ex $(CONH_SIM).o $(POLSQU_MOD).o
-	./$(CONH_SIM).ex conH test 0.2 12 1.0 0.5 1000000
+	./$(CONH_SIM).ex 1 conH test 0.2 12 1.0 0.5 3.0 1000000 0.96
 
 
 # rod3_test: clean

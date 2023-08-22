@@ -21,7 +21,9 @@ SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
 declare -i CELL=12
 # starting temperature of annealing simulation
-ANNEAL_TEMP="3.0"
+INIT_ANNEAL_TEMP="3.0"
+# final annealing temperature of an annealing simulation
+FINAL_ANNEAL_TEMP="0.01"
 # minimum field strength used for simulations
 declare -i FIELD_MIN=0
 # maximum field strength used for simulations
@@ -88,7 +90,7 @@ gensimdir () {
 	# external field value
 	local FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
 	# inital temperature assigned to simulation
-	local INIT_TEMP=$ANNEAL_TEMP
+	local INIT_TEMP=$INIT_ANNEAL_TEMP
 	# annealing fraction of simulation
 	local ANNEAL_FRAC=$(printf '%3.2f' $(awk "BEGIN { print ${FRAC} / 100 }"))
 
@@ -168,6 +170,15 @@ gensimdir () {
 		# if the file exists, remove it
 		rm "$SUBDAG_PATH"
 	fi
+
+	# establish initialization node
+	genCHTCinit
+
+	# establish rerun nodes
+	# genCHTCrerun # add name of repeated function?
+
+	# establish the final anneal node
+	genCHTCanneal
 }
 
 # script for generation the initialization conH node
@@ -265,7 +276,7 @@ genCHTCinit() {
 	# add node, pre- and post-script wrapper
 	echo "JOB init ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "SCRIPT PRE init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
+	echo "SCRIPT POST init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes
@@ -345,7 +356,7 @@ genCHTCanneal() {
 
 	# write submission script
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
-	echo "arguments = 0" >> $SUB_PATH
+	echo "arguments = 1" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
@@ -353,9 +364,9 @@ genCHTCanneal() {
 	echo "transfer_output_remaps = \"${TRANSFER_OUTPUT_REMAPS}\"" >> $SUB_PATH
 	echo "when_to_transfer_output = ON_SUCCESS" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	echo "log = out/init.log" >> $SUB_PATH
-	echo "error = out/init.err" >> $SUB_PATH
-	echo "output = out/init.out" >> $SUB_PATH
+	echo "log = out/anneal.log" >> $SUB_PATH
+	echo "error = out/anneal.err" >> $SUB_PATH
+	echo "output = out/anneal.out" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "request_cpus = 1" >> $SUB_PATH
 	echo "request_disk = ${REQUEST_MEMORY}" >> $SUB_PATH
@@ -368,9 +379,9 @@ genCHTCanneal() {
 
 	# add node, pre- and post-script wrapper
 	echo "JOB anneal ${SUB_NAME}" >> $SUBDAG_PATH
-	echo "SCRIPT PRE anneal prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST anneal postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN" >> $SUBDAG_PATH
-
+	echo "RETRY anneal 1000" >> $SUBDAG_PATH
+	echo "SCRIPT PRE anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 }
 
 ## OPTIONS
@@ -471,15 +482,6 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 
 			# generate simulation directory and files
 			gensimdir
-
-			# establish initialization node
-			genCHTCinit
-
-			# establish rerun nodes
-			# genCHTCrerun # add name of repeated function?
-
-			# establish the final anneal node
-			# genCHTCanneal
 
 			# TODO :: establish analysis nodes
 
