@@ -70,7 +70,7 @@ OUTNAME="${JOB}${SIMID}_stdout.txt"
 if [[ BOOL_INIT -eq 1 ]]; then 
 	./savesave.sh -i $JOB $SIMID $RETURN_VAL >> "${OUTNAME}" 2>&1
 elif [[ BOOL_ANNEAL -eq 1 ]]; then 
-	./savesave.sh -a "${ANNEAL_TEMP}" $JOB $SIMID $RETURN_VAL $RETRY_VAL
+	./savesave.sh -a "${ANNEAL_TEMP}" $JOB $SIMID $RETURN_VAL $RETRY_VAL >> "${OUTNAME}" 2>&1
 fi
 
 exit 0

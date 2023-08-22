@@ -44,7 +44,7 @@ declare -i ACHAI_MAX=100
 # between the maxmimum and the minimum
 declare -i ACHAI_INC=25
 # default number of simulation events, unless specified by user
-declare -i EVENTS=100000000
+declare -i EVENTS=1000000
 # default fraction used to decrease simulation temperature
 declare -i FRAC=95
 # number of times that each simulation is repeated
@@ -151,6 +151,7 @@ gensimdir () {
 	done
 	# copy pre / post - script wrappers for annealing simulations
 	cp ./simbin/bash/chtc/anneal_wrappers/* "${D}"
+	chmod u+x "${D}comp_temp.py" # add execution status to python script
 
 	# write the executable to the simulation directory
 	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
@@ -234,7 +235,7 @@ genCHTCinit() {
 	# list of files that should be transfered from the execute node
 	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
-	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
+	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN}; ${RMP_SIM_TXT} ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 	## PARAMETERS - EXECUTION INSTRUCTIONS
 	# none
@@ -265,18 +266,19 @@ genCHTCinit() {
 	echo "output = out/init.out" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "request_cpus = 1" >> $SUB_PATH
-	echo "request_disk = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
+	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "queue" >> $SUB_PATH
 
 	# add node, pre- and post-script wrapper
-	echo "JOB init ${SUB_NAME}" >> $SUBDAG_PATH
-	echo "SCRIPT PRE init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
+	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes
@@ -291,7 +293,7 @@ genCHTCanneal() {
 	# path to file containing submission instructions
 	local SUB_PATH="${D}${SUB_NAME}"
 	# name of the executable file
-	local EXEC_NAME="sub/exec/conH_anneal.sh"
+	local EXEC_NAME="sub/exec/conH.sh"
 	# name of the executable
 	local EXEC_PATH="${D}${EXEC_NAME}"
 	# id for the simulation that the initialization node is being generated for
@@ -369,19 +371,21 @@ genCHTCanneal() {
 	echo "output = out/anneal.out" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "request_cpus = 1" >> $SUB_PATH
-	echo "request_disk = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
+	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "queue" >> $SUB_PATH
 
 	# add node, pre- and post-script wrapper
-	echo "JOB anneal ${SUB_NAME}" >> $SUBDAG_PATH
-	echo "RETRY anneal 1000" >> $SUBDAG_PATH
-	echo "SCRIPT PRE anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo "JOB ${ANNEALID}_anneal ${SUB_NAME}" >> $SUBDAG_PATH
+	echo "RETRY ${ANNEALID}_anneal 1000" >> $SUBDAG_PATH
+	echo "PARENT ${ANNEALID}_init CHILD ${ANNEALID}_anneal" >> $SUBDAG_PATH
+	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 }
 
 ## OPTIONS

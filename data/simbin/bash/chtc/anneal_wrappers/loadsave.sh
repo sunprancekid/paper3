@@ -14,7 +14,7 @@ CURRENTTIME=$(date '+%Y-%m-%d %H:%M:%S')
 # non-zero exit code for incorrect operations
 declare -i NONZERO_EXITCODE=1
 # array containing a list of SAVE files
-SAVE=( "fposSAVE" "velSAVE" "chaiSAVE" "annSAVE" "simSAVE" )
+SAVE=( "fposSAVE" "velSAVE" "chaiSAVE" "annealSAVE" "simSAVE" )
 # temp file used to store information about saving and loading
 # annealing simulations between pre- and post-processing scripts
 TMP_FILE="./anneal/tmp/next_dir.txt"
@@ -76,11 +76,20 @@ if [[ BOOL_LOADINIT -eq 1 ]]; then
 elif [[ BOOL_LOADLAST -eq 1 ]]; then
 	# if loading the previous state of an annealing simulation
 	# get the directory that contains the previous state from the temporary file
-	NXT_DIR=$( head -n 1 $TMP_FILE | tail -n 1 )
+	NXT_DIR_INT=$( head -n 1 $TMP_FILE | tail -n 1 )
+	if [[ "${NXT_DIR_INT}" == "init" ]]; then 
+		# if the directory to load is the initial
+		NXT_DIR=$NXT_DIR_INT
+	else 
+		# otherwise the directory is stored as an integer
+		declare -i NXT_DIR_INT=$NXT_DIR_INT
+		# format the next directory
+		NXT_DIR=$(printf '%03d' ${NXT_DIR_INT})
+	fi
 
 	# copy each save file from the save directory, to the tmp directory
 	for s in ${SAVE[@]}; do
-		cp "./anneal/${NXT_DIR}/${JOB}${SAVE}__${s}" "./anneal/tmp/"
+		cp "./anneal/${NXT_DIR}/${JOB}${SIMID}__${s}.dat" "./anneal/tmp/"
 	done
 
 	# inform the user

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys, os
 current_temp = float(sys.argv[1])
 anneal_temp = float(sys.argv[2])

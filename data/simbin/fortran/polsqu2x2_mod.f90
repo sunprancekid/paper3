@@ -1187,7 +1187,7 @@ subroutine initialize_system (job, sim)
     ! ghost event
 
     ! initialize groupings
-    ! call reset_state ()
+    call reset_state ()
     call initial_state()
     call set_position ()
     call set_velocity ()
@@ -2261,7 +2261,8 @@ subroutine open_files ()
 
     annealfile = trim(jobid) // trim(simid) // '_anneal.csv' ! comma seperated list containing a summary of annealing simulations
     open (unit = annealiounit, file = trim(annealfile), status = 'REPLACE', iostat = ioerror)
-    write(annealiounit,*) 'id, time, set, temp, te, te_fluc, pot, pot_fluc, ke, ke_fluc, nematic, nem_fluc, allign, allign_fluc'
+    write(annealiounit,*) 'id,time,set,temp,te,te_fluc,pot,pot_fluc,ke,ke_fluc,poly2,poly2_fluc,',&
+        'anti,anti_fluc,full,full_fluc,percy,percy_fluc,nematic,nem_fluc,allign,allign_fluc'
 
     reportfile = trim(jobid) // trim (simid) // '.csv' ! comma seperated list containing time progression of properties 
     open (unit = reportiounit, file = reportfile, status = 'REPLACE')
@@ -2385,9 +2386,11 @@ subroutine close_files ()
     write(reportiounit, *) ' red pote per cube  , ', (pot%equilavg / epsilon1)
     close (unit = reportiounit, status = 'KEEP')
     close (unit = opiounit, status = 'KEEP')
-    write(annealiounit, *) anneal, ',', timenow, ',', tempset, ',', temp%equilavg, ',', te%equilavg, & 
-        ',', te%equilstd, ',', pot%equilavg, ',', pot%equilstd, ',', ke%equilavg,',', ke%equilstd, &
-        ',', nematic%equilavg , ',', nematic%equilstd, ',', allign%equilavg, ',', allign%equilstd
+    write(annealiounit, *) anneal,',',timenow,',',tempset,',',temp%equilavg,',',te%equilavg, & 
+        ',',te%equilstd,',',pot%equilavg,',',pot%equilstd,',',ke%equilavg,',',ke%equilstd, &
+        ',',poly2%equilavg,',',poly2%equilstd,',',anti%equilavg,',',anti%equilstd,',',&
+        full%equilavg,',',full%equilstd,',',percy%equilavg,',',percy%equilstd,&
+        ',',nematic%equilavg ,',',nematic%equilstd,',',allign%equilavg,',',allign%equilstd
     close (unit = annealiounit, status = 'KEEP')
 
     write(mmiounit, *) boundary_index, ',', upper_nematic_boundary, ',', lower_nematic_boundary, ',', &
