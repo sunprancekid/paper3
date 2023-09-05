@@ -11,6 +11,7 @@ set -e
 LOGIN="mad@ap21.uc.osg-htc.org"
 # mad@login05.osgconnect.net
 # mad@ap21.uc.osg-htc.org
+# matthew.dorsey@ap1.facility.path-cc.io
 # location of simulation directory
 LOC="~/paper3/data/"
 # command and flags for remote synchronization

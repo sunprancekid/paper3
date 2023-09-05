@@ -153,7 +153,7 @@ real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bon
 ! ** andersen thermostat *************************************
 ! assigned system temperature, used to initialize the velocity
 ! of simulation particles
-real(kind=dbl), parameter :: default_temperature = 0.5
+real(kind=dbl), parameter :: default_temperature = 3.0
 real(kind=dbl), parameter :: max_temperature = 10.
 real(kind=dbl), parameter :: min_temperature = 0.001
 logical :: use_default_temperature = .true.
@@ -807,11 +807,11 @@ subroutine set_square_movie (status, freq)
     endif
 end subroutine set_square_movie
 
-subroutine set_thermostat (status, temp, freq) 
+subroutine set_thermostat (status, freq) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if thermostat should be turned on or off
-    real, intent(in), optional :: temp 
+    ! real, intent(in), optional :: temp 
     ! temperature set point of thermostat, strength of ghost collisions
     real, intent(in), optional :: freq
     ! frequency of thermostat ghost collisions per particle
@@ -828,14 +828,14 @@ subroutine set_thermostat (status, temp, freq)
         endif 
     endif
 
-    if (present(temp)) then 
-        ! check that the value is greater than zero
-        if (set_temperature(temp)) then 
-            use_default_temperature = .false.
-            1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
-            write (*,1) tempset
-        endif
-    endif
+    ! if (present(temp)) then 
+    !     ! check that the value is greater than zero
+    !     if (set_temperature(temp)) then 
+    !         use_default_temperature = .false.
+    !         1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
+    !         write (*,1) tempset
+    !     endif
+    ! endif
 
     if (present(freq)) then 
         ! check that the value is greater than zero

@@ -46,14 +46,16 @@ program conH
 
     ! initialize the simulation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = a_chai_frac)
-    call set_sphere_movie (status = .false.)
-    call set_square_movie (status = .true., freq = 1000.)
-    call set_thermostat (status = .true., temp = init_temperature, freq = 0.1)
-    call set_external_field (status = .true., strength = field_strength)
 
     ! initialize system
     call initialize_system(job = trim(args(2)), sim = trim(args(3)))
     call initialize_annealing(status = .true., frac = annealing_fraction)
+
+    ! set simulation parameters
+    call set_sphere_movie (status = .false.)
+    call set_square_movie (status = .true., freq = 1000.)
+    call set_thermostat (status = .true., freq = 0.1)
+    call set_external_field (status = .true., strength = field_strength)
 
     ! save the status of the simulation after initialization
     call save()

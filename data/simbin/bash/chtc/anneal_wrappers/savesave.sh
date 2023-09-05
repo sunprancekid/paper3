@@ -87,6 +87,10 @@ elif [[ BOOL_ANNEAL -eq 1 ]]; then
 	# inform the user
 	echo "${CURRENTTIME}: anneal node completed (exit code ${RETURN_VAL}, number of attempts ${RETRY_VAL})."
 
+	# parse the temperature from the save file
+	SAVE_FILE="./anneal/tmp/${JOB}${SIMID}__simSAVE.dat"
+	CURR_TEMP=$( head -n 3 $SAVE_FILE | tail -n 1 )
+
 	# save the current files from the most recent simulation to the appropriate directory
 	# get the directory that the files were loaded from
 	NXT_DIR_INT=$( head -n 1 $TMP_FILE | tail -n 1 )
@@ -111,11 +115,8 @@ elif [[ BOOL_ANNEAL -eq 1 ]]; then
 		# copy the file from the temporary directory to
 		# the directory corresponding to the annealing directory
 		cp "${f}" "./anneal/${NXT_DIR}/"
+		rm "${f}"
 	done
-
-	# parse the temperature from the save file
-	SAVE_FILE="./anneal/tmp/${JOB}${SIMID}__simSAVE.dat"
-	CURR_TEMP=$( head -n 3 $SAVE_FILE | tail -n 1 )
 
 	# determine if the temperature meets the criteria to exit the annealing loop
 	declare -i BOOL_EXIT=$( ./comp_temp.py "${CURR_TEMP}" "${ANNEAL_TEMP}")
@@ -131,7 +132,7 @@ elif [[ BOOL_ANNEAL -eq 1 ]]; then
 		# store the next integer in the temp directory file for the pre-wrapping script
 		echo "${NXT_DIR_INT}" > $TMP_FILE
 		# exit script with non-zero exit code
-		exit 0 # TODO :: change to nonzero exit code
+		exit $NONZERO_EXITCODE
 	fi
 fi
 

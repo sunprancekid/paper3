@@ -14,18 +14,20 @@ declare -i VERB_BOOL=0
 # boolean that determines if the the script should overwrite directories
 # containing existing simulation files that correspond to job
 declare -i OVERWRITE_BOOL=0
+# boolean that determines if the job should be submited to CHTC
+declare -i SUBMIT_BOOL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
 SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
-declare -i CELL=12
+declare -i CELL=24
 # starting temperature of annealing simulation
 INIT_ANNEAL_TEMP="3.0"
 # final annealing temperature of an annealing simulation
 FINAL_ANNEAL_TEMP="0.01"
 # minimum field strength used for simulations
-declare -i FIELD_MIN=0
+declare -i FIELD_MIN=20
 # maximum field strength used for simulations
 declare -i FIELD_MAX=20
 # integer used to increment the field by between maximum and minimum
@@ -33,22 +35,23 @@ declare -i FIELD_INC=2
 # minimum value used for density
 declare -i ETA_MIN=5
 # maximum value used for density
-declare -i ETA_MAX=60
+declare -i ETA_MAX=5
 # integer amount to increment density by between maximum and minimum
 declare -i ETA_INC=5
 # minimum fraction of a-chirality squares used in simulations
-declare -i ACHAI_MIN=100
+declare -i ACHAI_MIN=50
 # maximum fraction of a-chirality squares used in simulations
-declare -i ACHAI_MAX=100
+declare -i ACHAI_MAX=50
 # integer amount to increment fraction of a-chirality squares by
 # between the maxmimum and the minimum
 declare -i ACHAI_INC=25
 # default number of simulation events, unless specified by user
-declare -i EVENTS=1000000
+declare -i EVENTS=100000000
 # default fraction used to decrease simulation temperature
-declare -i FRAC=95
+declare -i FRAC=96
 # number of times that each simulation is repeated
 declare -i NUM_REPLICATES=3
+# TODO :: replicates are not actually implemented
 
 
 ## FUNCTIONS
@@ -61,6 +64,7 @@ help () {
 	echo -e "\nScript for generating conH jobs on CHTC systems.\nUSAGE: ./conH.sh << FLAGS >>\n"
 	echo -e " -v           | execute script verbosely"
 	echo -e " -o           | overwrite existing simulation files and directories corresponding to job"
+	echo -e " -s           | submit job to CHTC"
 	echo -e " -j << ARG >> | specify job title (default is ${JOB})"
 	echo -e " -c << ARG >> | specify simulation cell size (default is ${CELL})"
 	echo -e " -e << ARG >> | specify simulation events (default is ${EVENTS})"
@@ -235,7 +239,7 @@ genCHTCinit() {
 	# list of files that should be transfered from the execute node
 	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
-	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN}; ${RMP_SIM_TXT} ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
+	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 	## PARAMETERS - EXECUTION INSTRUCTIONS
 	# none
@@ -255,6 +259,8 @@ genCHTCinit() {
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
 	echo "arguments = 0" >> $SUB_PATH
 	echo "" >> $SUB_PATH
+	# echo "+SingularityImage = \"osdf:///cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
+	echo "" >> $SUB_PATH
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
 	echo "transfer_output_files = ${TRANSFER_OUTPUT_FILES}" >> $SUB_PATH
@@ -271,6 +277,7 @@ genCHTCinit() {
 	echo "" >> $SUB_PATH
 	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
+	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "queue" >> $SUB_PATH
@@ -342,9 +349,9 @@ genCHTCanneal() {
 	# list of files that should be transfered to the execute node
 	local TRANSFER_INPUT_FILES="sub/fortran/conH.f90, sub/fortran/polsqu2x2_mod.f90, ${INPT_SIM_ANN_SAVE}, ${INPT_SIM_SIM_SAVE}, ${INPT_SIM_VEL_SAVE}, ${INPT_SIM_CHAI_SAVE}, ${INPT_SIM_FPOS_SAVE}"
 	# list of files that should be transfered from the execute node
-	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
+	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN}, ${SIM_TXT}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
 	# list of remap instructions for each output file
-	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
+	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN}; ${RMP_SIM_TXT}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 
 	## ARGUMENTS
@@ -359,6 +366,8 @@ genCHTCanneal() {
 	# write submission script
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
 	echo "arguments = 1" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	# echo "+SingularityImage = \"osdf:///cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
@@ -375,6 +384,7 @@ genCHTCanneal() {
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
@@ -390,7 +400,7 @@ genCHTCanneal() {
 
 ## OPTIONS
 # parse options
-while getopts "voj:c:e:f:" option; do 
+while getopts "vosj:c:e:f:" option; do 
 	case $option in
 		v) # execute script verbosely
 			
@@ -402,6 +412,11 @@ while getopts "voj:c:e:f:" option; do
 			# boolean that determines if the script should
 			# overwrite existing simulation data corresponding to job
 			declare -i OVERWRITE_BOOL=1
+			;;
+		s) # submit job to CHTC 
+
+			# boolean that determines if the script should submit the job to CHTC
+			declare -i SUBMIT_BOOL=1
 			;;
 		j) # specify the name of the job
 			
@@ -505,6 +520,8 @@ while [[  ACHAI -le ACHAI_MAX ]]; do
 done
 
 # submit job to CHTC
-condor_submit_dag -batch-name "${JOBID}" ${DAG} > ${JOBID}_dagsub.out
-sleep 10
-condor_watch_q
+if [[ SUBMIT_BOOL -eq 1 ]]; then
+	condor_submit_dag -batch-name "${JOBID}" ${DAG} > ${JOBID}_dagsub.out
+	sleep 10
+	condor_watch_q
+fi
