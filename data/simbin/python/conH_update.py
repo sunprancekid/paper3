@@ -37,7 +37,33 @@ def get_dir_params(dir_path, subdir_regex):
 # method used to compile results from the simulation, report the current
 # state of the simulation to the user
 def update_simulation_results(sim_dir):
-	print(sim_dir)
+
+	# parse the simid from the splice file
+	simid = glob.glob(sim_dir + "*.spl")
+	simid = simid[0]
+	print(simid)
+
+	# create the analysis directory, if it does not exist already
+
+	# get the list of directories in the annealing directory that
+	# match the naming convention
+
+	# parse the header for the anneal file from the first simulation,
+	# write to analysis file
+
+	# write the annealing results from each simulation to the simulation
+	# summary file
+
+	# parse the results for each order parameter, and the corresponding 
+	# temperature that they were calculated at
+
+	# plot the current temperature of the simulation and the assign temperature
+	# according to the number of steps that the simulation has taken / current
+	# simuation iteration
+
+	# plot the order parameter and its fluctuation as a figure
+
+
 
 
 ## ARGUMENTS
