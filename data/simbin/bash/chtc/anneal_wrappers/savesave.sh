@@ -20,6 +20,9 @@ TMP_FILE="./anneal/tmp/next_dir.txt"
 declare -i BOOL_SAVEINIT=0
 # boolean used to determine if the script is handling an annealing simulation
 declare -i BOOL_ANNEAL=0
+# boolean used to determine if the script is handling a rerun of a previous
+# iteration of the annealing simulation
+declare -i BOOL_RERUN=0
 # boolean determining if last save should be loaded
 declare -i BOOL_LOADLAST=0
 # boolean determining if simulation should be saved
@@ -27,7 +30,7 @@ declare -i BOOL_SAVE=0
 
 
 ## OPTIONS
-while getopts "ia:ls" option; do
+while getopts "ia:lsr:" option; do
     case $option in
     	i) # save initial simulation data
 
@@ -42,6 +45,16 @@ while getopts "ia:ls" option; do
 			# the value passed with the flag is the minimum temperature 
 			# that the simulation reaches before exiting the annealing loop
 			ANNEAL_TEMP=${OPTARG};;
+		r) # save a specific rerun of a previous iteration of an annealing simulation
+
+			# boolean that determines if the the script is handling a previous
+			# iteration of a previous version of the annealing simulation
+			declare -i BOOL_ANNEAL=1
+
+			# the value passed with the flag is the integer corresponding to the 
+			# iteration of the annealing simulation that was rerun and 
+			# that the script is handling
+			declare -i RERUN_IT=${OPTARG};; 
 		l) # load last save
 
 			# boolean determining if last save should be loaded
@@ -134,6 +147,8 @@ elif [[ BOOL_ANNEAL -eq 1 ]]; then
 		# exit script with non-zero exit code
 		exit $NONZERO_EXITCODE
 	fi
+elif [[ BOOL_RERUN -eq 1 ]]; then 
+	echo "TODO :: add instructions for how to handle rerun of annealing iteration (${RERUN_IT})"
 fi
 
 exit 0

@@ -14,6 +14,9 @@ declare -i NONZERO_EXITCODE=1
 declare -i BOOL_INIT=0
 # boolean determining if the simulation is handling an iteration of the annealing simulation
 declare -i BOOL_ANNEAL=0
+# boolean determining if the script is handling a rerun of a previous iteration
+# of the annealing simulation
+declare -i BOOL_RERUN=0
 # boolean determining if the simulation should be checked
 declare -i BOUND_BOOL=0
 # boolean determine if the number of system iterations should be checked
@@ -22,7 +25,7 @@ declare -i COUNT_BOOL=0
 ## OPTIONS
 # determine exit criteria
 # flags are used for specifying exit criteria 
-while getopts "ia:b:n:" option; do
+while getopts "ia:r:" option; do
     case $option in
     	i) # flag for how the script should handle the initial simulation
 			
@@ -38,6 +41,16 @@ while getopts "ia:b:n:" option; do
 			# the annealing flag accepts the temperature at which
 			# the annealing loop should break
 			ANNEAL_TEMP=${OPTARG}
+			;;
+		r) # flag for how the script should handle reruns of an iteration of an annealing simulation
+			
+			# boolean determining if the script is handling a rerun
+			# of a previous iteration of the annealing simulation
+			declare BOOL_RERUN=1 
+
+			# the rerun flag accepts integer corresponding to the iteration
+			# of the annealing simulation that the script is handling
+			declare -i RERUN_IT=${OPTARG}
 			;;
 		\?) # default
 			echo "must declare arguments" ;;
@@ -68,9 +81,11 @@ OUTNAME="${JOB}${SIMID}_stdout.txt"
 
 # determine the operation to perform
 if [[ BOOL_INIT -eq 1 ]]; then 
-	./savesave.sh -i $JOB $SIMID $RETURN_VAL >> "${OUTNAME}" 2>&1
+	./savesave.sh -i $JOB $SIMID $RETURN_VAL $RETRY_VAL >> "${OUTNAME}" 2>&1
 elif [[ BOOL_ANNEAL -eq 1 ]]; then 
 	./savesave.sh -a "${ANNEAL_TEMP}" $JOB $SIMID $RETURN_VAL $RETRY_VAL >> "${OUTNAME}" 2>&1
+elif [[ BOOL_RERUN -eq 1 ]]; then
+	./savesave -r ${RERUN_IT} $JOB $SIMID $RETURN_VAL $RETRY_VAL >> "${OUTNAME}" 2>&1
 fi
 
 exit 0
