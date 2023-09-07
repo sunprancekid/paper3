@@ -148,7 +148,23 @@ elif [[ BOOL_ANNEAL -eq 1 ]]; then
 		exit $NONZERO_EXITCODE
 	fi
 elif [[ BOOL_RERUN -eq 1 ]]; then 
-	echo "TODO :: add instructions for how to handle rerun of annealing iteration (${RERUN_IT})"
+	# once the simulation is finished, move the files from the temporary directory to the
+	# annealing directory corresponding to the iteration
+	RERUN_DIR=$(printf '%03d' ${RERUN_IT})
+	SIM_FILES=(./anneal/tmp/${RERUN_DIR}/${JOB}${SIMID}*)
+	for f in ${SIM_FILES[@]}; do
+		# copy the file from the temporary directory to
+		# the directory corresponding to the annealing directory
+		cp "${f}" "./anneal/${RERUN_DIR}/"
+		rm "${f}"
+	done
+
+	# delete the temporary directory corresponding to the annealing simulation rerun
+	rm -r "./anneal/tmp/${RERUN_DIR}"
+
+	# signal that the simulation was successfully completed by exiting with a 0 exit code
+	echo "${CURRENTTIME}: Annealing rerun succesfully completed."
+	exit 0
 fi
 
 exit 0
