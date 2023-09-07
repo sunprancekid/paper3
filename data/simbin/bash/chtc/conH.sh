@@ -16,18 +16,21 @@ declare -i VERB_BOOL=0
 declare -i OVERWRITE_BOOL=0
 # boolean that determines if the job should be submited to CHTC
 declare -i SUBMIT_BOOL=0
+# boolean that determines if annealing simulations which have
+# already been performed should be rerun
+declare -i RERUN_BOOL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
 SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
-declare -i CELL=24
+declare -i CELL=15
 # starting temperature of annealing simulation
 INIT_ANNEAL_TEMP="3.0"
 # final annealing temperature of an annealing simulation
 FINAL_ANNEAL_TEMP="0.01"
 # minimum field strength used for simulations
-declare -i FIELD_MIN=20
+declare -i FIELD_MIN=0
 # maximum field strength used for simulations
 declare -i FIELD_MAX=20
 # integer used to increment the field by between maximum and minimum
@@ -35,13 +38,13 @@ declare -i FIELD_INC=2
 # minimum value used for density
 declare -i ETA_MIN=5
 # maximum value used for density
-declare -i ETA_MAX=5
+declare -i ETA_MAX=60
 # integer amount to increment density by between maximum and minimum
 declare -i ETA_INC=5
 # minimum fraction of a-chirality squares used in simulations
 declare -i ACHAI_MIN=50
 # maximum fraction of a-chirality squares used in simulations
-declare -i ACHAI_MAX=50
+declare -i ACHAI_MAX=100
 # integer amount to increment fraction of a-chirality squares by
 # between the maxmimum and the minimum
 declare -i ACHAI_INC=25
@@ -65,6 +68,7 @@ help () {
 	echo -e " -v           | execute script verbosely"
 	echo -e " -o           | overwrite existing simulation files and directories corresponding to job"
 	echo -e " -s           | submit job to CHTC"
+	echo -e " -r           | rerun anneal simulations that have already been performed."
 	echo -e " -j << ARG >> | specify job title (default is ${JOB})"
 	echo -e " -c << ARG >> | specify simulation cell size (default is ${CELL})"
 	echo -e " -e << ARG >> | specify simulation events (default is ${EVENTS})"
@@ -109,6 +113,13 @@ gensimdir () {
 		echo -e "\nGenerating annealing simulation (${ANNEALID}) in: ${D}"
 	fi
 
+	# establish the subdag path
+	SUBDAG_PATH="${D}${SUBDAG}"
+	if [[ -f "$SUBDAG_PATH" ]]; then 
+		# if the file exists, remove it
+		rm "$SUBDAG_PATH"
+	fi
+
 	# check if directory already exists
 	declare -i GEN_DIR=0
 	if [[ -d "${D}" ]]; then 
@@ -135,6 +146,7 @@ gensimdir () {
 			echo "Generating directory .."
 		fi
 	fi
+
 	# if it does not, generate subdirectories
 	# or, if overwrite is true, delete the directory
 	# re-generate everything
@@ -145,6 +157,51 @@ gensimdir () {
 		for sd in "${SUBDIR[@]}"; do 
 			mkdir -p "${D}${sd}/"
 		done
+
+		# establish the initialization node
+		genCHTCinit
+
+		# establish the annealing loop node
+		genCHTCanneal -i
+	else
+
+		# if the directory already exists, determine how many
+		# time the anneal simulation has already been performed
+		local -a dirs=( ${D}anneal/[0-9][0-9][0-9] )
+		# printf 'Matching Directory: %s\n' "${dirs[@]}"
+		declare -i N_ANNEAL=${#dirs[@]}
+		((N_ANNEAL=N_ANNEAL-2))
+
+		# determine the nodes to intialize based on the number of annealing
+		# simulations that have been performed
+		if [[ N_ANNEAL -le 0 ]];
+		then
+			# if no annealing simulations have been performed
+			# establish the initial annealing
+			echo "No annealing simulations have been performed"
+		else
+			# inform the user of the annealing simulations that
+			# have been performed already
+			echo "${N_ANNEAL} annealing simulations have already been performed."
+
+			# if some annealing simulations have been performed
+			# rerun all of the previous annealing simulations
+			if [[ RERUN_BOOL -eq 1 ]]; then
+				echo "TODO :: Implement rerun feature."
+				# for (( i=0; i<$N_ANNEAL; i++ ))
+				# do
+				# 	echo $i
+				# done
+			fi
+
+			# establish the annealing loop
+			genCHTCanneal
+
+			# write the directory of the most recently run annealing
+			# simulation to the tmp directory, for the annealing loop
+			echo $(printf '%03d' ${N_ANNEAL}) > "${D}anneal/tmp/nxt_dir.txt"
+
+		fi
 	fi
 
 	## add / write files to the directory
@@ -168,22 +225,6 @@ gensimdir () {
 	echo "./conH.ex \$1 ${JOBID} ${ANNEALID} ${AF_VAL} ${CELL_VAL} ${ACHAI_VAL} ${FIELD_VAL} ${INIT_TEMP} ${EVENTS} ${ANNEAL_FRAC}"  >> $EXEC_PATH 
 	# add execution capabilities to script
 	chmod u+x $EXEC_PATH
-
-	# initialize the subdag
-	SUBDAG_PATH="${D}${SUBDAG}"
-	if [[ -f "$SUBDAG_PATH" ]]; then 
-		# if the file exists, remove it
-		rm "$SUBDAG_PATH"
-	fi
-
-	# establish initialization node
-	genCHTCinit
-
-	# establish rerun nodes
-	# genCHTCrerun # add name of repeated function?
-
-	# establish the final anneal node
-	genCHTCanneal
 }
 
 # script for generation the initialization conH node
@@ -259,7 +300,7 @@ genCHTCinit() {
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
 	echo "arguments = 0" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	# echo "+SingularityImage = \"osdf:///cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
+	echo "+SingularityImage = \"/cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
@@ -295,6 +336,9 @@ genCHTCinit() {
 genCHTCanneal() {
 
 	## PARAMETERS
+	# boolean used to determine if the annealing node should have a 
+	# parent child relationship with the initialization node
+	declare -i INIT_BOOL=0
 	# name of file containing submission instructions
 	local SUB_NAME="sub/anneal.sub"
 	# path to file containing submission instructions
@@ -354,6 +398,25 @@ genCHTCanneal() {
 	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN}; ${RMP_SIM_TXT}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
 
 
+	## OPTIONS
+	# parse options
+	while getopts "o" option; do 
+		case $option in
+			o) # establish parent child relationship between annealing and initial node
+				
+				# boolean that determines if the script should establish a parent
+				# child relationship between the annealing node and the initial node
+				declare -i INIT_BOOL=1
+				;;
+			\?) # default if illegal argument specified
+				
+				echo -e "\ngenCHTCanneal: Illegal argument ${option} specified.\n"
+				return
+		esac
+	done
+	shift $((OPTIND-1))
+
+
 	## ARGUMENTS
 	# none
 
@@ -367,7 +430,7 @@ genCHTCanneal() {
 	echo "executable = ${EXEC_NAME}" > $SUB_PATH
 	echo "arguments = 1" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	# echo "+SingularityImage = \"osdf:///cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
+	echo "+SingularityImage = \"/cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "should_transfer_files = YES" >> $SUB_PATH
 	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
@@ -393,14 +456,16 @@ genCHTCanneal() {
 	# add node, pre- and post-script wrapper
 	echo "JOB ${ANNEALID}_anneal ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "RETRY ${ANNEALID}_anneal 1000" >> $SUBDAG_PATH
-	echo "PARENT ${ANNEALID}_init CHILD ${ANNEALID}_anneal" >> $SUBDAG_PATH
+	if [[ INIT_BOOL -eq 1 ]]; then 
+		echo "PARENT ${ANNEALID}_init CHILD ${ANNEALID}_anneal" >> $SUBDAG_PATH
+	fi
 	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 }
 
 ## OPTIONS
 # parse options
-while getopts "vosj:c:e:f:" option; do 
+while getopts "vosrj:c:e:f:" option; do 
 	case $option in
 		v) # execute script verbosely
 			
@@ -417,6 +482,12 @@ while getopts "vosj:c:e:f:" option; do
 
 			# boolean that determines if the script should submit the job to CHTC
 			declare -i SUBMIT_BOOL=1
+			;;
+		r) # rerun annealing simulations that have already been completed
+
+			# boolean that determines if annealing simulations that have 
+			# already been performed should be rerun
+			declare -i RERUN_BOOL=1
 			;;
 		j) # specify the name of the job
 			
