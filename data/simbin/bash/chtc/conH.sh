@@ -187,11 +187,11 @@ gensimdir () {
 			# if some annealing simulations have been performed
 			# rerun all of the previous annealing simulations
 			if [[ RERUN_BOOL -eq 1 ]]; then
-				echo "TODO :: Implement rerun feature."
-				# for (( i=0; i<$N_ANNEAL; i++ ))
-				# do
-				# 	echo $i
-				# done
+				echo "Rerunning previous annealing nodes."
+				for (( i=0; i<$N_ANNEAL; i++ ))
+				do
+					genCHTCanneal_rerun i
+				done
 			fi
 
 			# establish the annealing loop
@@ -199,7 +199,9 @@ gensimdir () {
 
 			# write the directory of the most recently run annealing
 			# simulation to the tmp directory, for the annealing loop
-			echo $(printf '%03d' ${N_ANNEAL}) > "${D}anneal/tmp/nxt_dir.txt"
+			echo $(printf '%03d' ${N_ANNEAL}) > "${D}anneal/tmp/next_dir.txt"
+
+			exit 0
 
 		fi
 	fi
@@ -399,22 +401,7 @@ genCHTCanneal() {
 
 
 	## OPTIONS
-	# parse options
-	while getopts "o" option; do 
-		case $option in
-			o) # establish parent child relationship between annealing and initial node
-				
-				# boolean that determines if the script should establish a parent
-				# child relationship between the annealing node and the initial node
-				declare -i INIT_BOOL=1
-				;;
-			\?) # default if illegal argument specified
-				
-				echo -e "\ngenCHTCanneal: Illegal argument ${option} specified.\n"
-				return
-		esac
-	done
-	shift $((OPTIND-1))
+	# none
 
 
 	## ARGUMENTS
@@ -461,6 +448,149 @@ genCHTCanneal() {
 	fi
 	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+}
+
+# script for generating annealing nodes that should be rerun
+# the rerun node loads the save files from the previous simulation,
+# and continues running the simulation from the save point of those 
+# files. Once the simulations are finished running, the files are 
+# are save to the temporary directory with an integer corresponding
+# for the integer of the annealing simulation, and the postscript-
+# wrapper moves them to appropraite anneal directory once the node
+# has completely finished running
+genCHTCanneal_rerun () {
+
+	## ARGUMENTS
+	# integer corresponding to the iteration of the annealing simulation that
+	# is being rerun
+	declare -i RERUN_IT=$1
+
+	## PARAMETERS
+	# directory corresponding to the current iteration of the annealing simulation
+	CURR_DIR=$(printf '%03d' ${RERUN_IT})
+	CURR_DIR="${CURR_DIR}"
+	# directory corresponding to the previous simulations that should be
+	# loaded for the current iteration of the annealing simulation
+	if [[ RERUN_IT -eq 0 ]]; then
+		# if the first iteraction of the annealing simulation is 
+		# being rerun, then the save files in the initial directory
+		# should be rerun
+		PREV_DIR="init"
+	else
+		# otherwise, the directory to load the save files from is the directory
+		# whose integer is one less than the current directory
+		declare -i PREV_INT=0
+		((PREV_INT=RERUN_IT-1))
+		PREV_DIR=$(printf '%03d' ${PREV_INT})
+		PREV_DIR="${PREV_DIR}"
+	fi
+	# name of file containing submission instructions
+	local SUB_NAME="sub/anneal${CURR_DIR}.sub"
+	# path to file containing submission instructions
+	local SUB_PATH="${D}${SUB_NAME}"
+	# name of the executable file
+	local EXEC_NAME="sub/exec/conH.sh"
+	# name of the executable
+	local EXEC_PATH="${D}${EXEC_NAME}"
+	# id for the simulation that the initialization node is being generated for
+	local SIM_ID="${JOBID}${ANNEALID}"
+
+	## PARAMETERS - FILES
+	# movie file
+	local SIM_MOV="${SIM_ID}_squmov.xyz"
+	# text file
+	local SIM_TXT="${SIM_ID}.txt"
+	# anneal file
+	local SIM_ANN="${SIM_ID}_anneal.csv"
+	# order parameter file
+	# TODO :: add remaping for order parameters calculated during simulation
+	# annealing save file
+	local SIM_ANN_SAVE="${SIM_ID}__annealSAVE.dat"
+	# chirality save file
+	local SIM_CHAI_SAVE="${SIM_ID}__chaiSAVE.dat"
+	# false position save file
+	local SIM_FPOS_SAVE="${SIM_ID}__fposSAVE.dat"
+	# velocity save file
+	local SIM_VEL_SAVE="${SIM_ID}__velSAVE.dat"
+	# simulation setting sim file
+	local SIM_SIM_SAVE="${SIM_ID}__simSAVE.dat"
+
+	## PARAMETERS - MAPPING TO INPUT FILES
+	# memory to request
+	local REQUEST_MEMORY="500MB"
+	# disk space to request
+	local REQUEST_DISK="1GB"
+	# directory that input files are loaded from
+	local REMAP_INPUT="anneal/${PREV_DIR}/"
+	# directory that the output files are saved to for postscript processing
+	local REMAP_OUTPUT="temp/${CURR_DIR}/"
+	# list of files with path to the input directory
+	local INPT_SIM_ANN_SAVE="${REMAP_INPUT}${SIM_ANN_SAVE}"
+	local INPT_SIM_CHAI_SAVE="${REMAP_INPUT}${SIM_CHAI_SAVE}"
+	local INPT_SIM_FPOS_SAVE="${REMAP_INPUT}${SIM_FPOS_SAVE}"
+	local INPT_SIM_VEL_SAVE="${REMAP_INPUT}${SIM_VEL_SAVE}"
+	local INPT_SIM_SIM_SAVE="${REMAP_INPUT}${SIM_SIM_SAVE}"
+	# list of files with remapping instructions
+	local RMP_SIM_MOV="${SIM_MOV}=${REMAP_OUTPUT}${SIM_MOV}"
+	local RMP_SIM_TXT="${SIM_TXT}=${REMAP_OUTPUT}${SIM_TXT}"
+	local RMP_SIM_ANN="${SIM_ANN}=${REMAP_OUTPUT}${SIM_ANN}"
+	local RMP_SIM_ANN_SAVE="${SIM_ANN_SAVE}=${REMAP_OUTPUT}${SIM_ANN_SAVE}"
+	local RMP_SIM_CHAI_SAVE="${SIM_CHAI_SAVE}=${REMAP_OUTPUT}${SIM_CHAI_SAVE}"
+	local RMP_SIM_FPOS_SAVE="${SIM_FPOS_SAVE}=${REMAP_OUTPUT}${SIM_FPOS_SAVE}"
+	local RMP_SIM_VEL_SAVE="${SIM_VEL_SAVE}=${REMAP_OUTPUT}${SIM_VEL_SAVE}"
+	local RMP_SIM_SIM_SAVE="${SIM_SIM_SAVE}=${REMAP_OUTPUT}${SIM_SIM_SAVE}"
+	# list of files that should be transfered to the execute node
+	local TRANSFER_INPUT_FILES="sub/fortran/conH.f90, sub/fortran/polsqu2x2_mod.f90, ${INPT_SIM_ANN_SAVE}, ${INPT_SIM_SIM_SAVE}, ${INPT_SIM_VEL_SAVE}, ${INPT_SIM_CHAI_SAVE}, ${INPT_SIM_FPOS_SAVE}"
+	# list of files that should be transfered from the execute node
+	local TRANSFER_OUTPUT_FILES="${SIM_MOV}, ${SIM_ANN}, ${SIM_TXT}, ${SIM_ANN_SAVE}, ${SIM_CHAI_SAVE}, ${SIM_FPOS_SAVE}, ${SIM_VEL_SAVE}, ${SIM_SIM_SAVE}"
+	# list of remap instructions for each output file
+	local TRANSFER_OUTPUT_REMAPS="${RMP_SIM_MOV}; ${RMP_SIM_ANN}; ${RMP_SIM_TXT}; ${RMP_SIM_ANN_SAVE}; ${RMP_SIM_CHAI_SAVE}; ${RMP_SIM_FPOS_SAVE}; ${RMP_SIM_VEL_SAVE}; ${RMP_SIM_SIM_SAVE}"
+
+
+	## OPTIONS
+	# none
+
+	echo "The CURRENT DIRECTORY is (${CURR_DIR}) and the PREVIOUS DIRECTORY is (${PREV_DIR})."
+	return
+
+	## SCRIPT
+	# if verbose, inform the user
+	if [[ VERB_BOOL -eq 1 ]]; then 
+		echo "Establishing looping anneal node for annealing simulation (${ANNEALID})."
+	fi
+
+	# write submission script
+	echo "executable = ${EXEC_NAME}" > $SUB_PATH
+	echo "arguments = 1" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "+SingularityImage = \"/cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "should_transfer_files = YES" >> $SUB_PATH
+	echo "transfer_input_files = ${TRANSFER_INPUT_FILES}" >> $SUB_PATH
+	echo "transfer_output_files = ${TRANSFER_OUTPUT_FILES}" >> $SUB_PATH
+	echo "transfer_output_remaps = \"${TRANSFER_OUTPUT_REMAPS}\"" >> $SUB_PATH
+	echo "when_to_transfer_output = ON_SUCCESS" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "log = out/anneal.log" >> $SUB_PATH
+	echo "error = out/anneal.err" >> $SUB_PATH
+	echo "output = out/anneal.out" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "request_cpus = 1" >> $SUB_PATH
+	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
+	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "requirements = HasSingularity" >> $SUB_PATH
+	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
+	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
+	echo "" >> $SUB_PATH
+	echo "queue" >> $SUB_PATH
+
+	# add node, pre- and post-script wrapper
+	echo "JOB ${ANNEALID}_anneal${CURR_DIR} ${SUB_NAME}" >> $SUBDAG_PATH
+	echo "RETRY ${ANNEALID}_anneal${CURR_DIR} 2" >> $SUBDAG_PATH
+	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 }
 
 ## OPTIONS

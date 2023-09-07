@@ -15,11 +15,14 @@ declare -i NONZERO_EXITCODE=1
 declare -i BOOL_LOADLAST=0
 # boolean that determines if the initial save should be loaded
 declare -i BOOL_LOADINIT=0
+# boolean determining if the script is handling a rerun of a previous iteration
+# of the annealing simulation
+declare -i BOOL_RERUN=0
 
 
 ## OPTIONS
 # parse options
-while getopts "ial" option
+while getopts "ialr:" option
 do 
 	case $option in 
 		i) # load the initial state 
@@ -30,6 +33,16 @@ do
 			
 			# boolean that determines if the previous annealing state should be loaded
 			declare -i BOOL_LOADLAST=1;;
+		r) # flag that the script is handing a previous iteration of an annealing simulation
+			
+			# boolean determining if the script is handling a rerun
+			# of a previous iteration of the annealing simulation
+			declare BOOL_RERUN=1 
+
+			# the rerun flag accepts integer corresponding to the iteration
+			# of the annealing simulation that the script is handling
+			declare -i RERUN_IT=${OPTARG}
+			;;
 		\?) # default
 			echo "Invalid option declared." >> "${OUTNAME}" 2>&1;;
 	esac
@@ -58,6 +71,8 @@ if [[ BOOL_LOADINIT -eq 1 ]]; then
 	./loadsave.sh -i $JOB $SIMID >> "${OUTNAME}" 2>&1
 elif [[ BOOL_LOADLAST -eq 1 ]]; then 
 	./loadsave.sh -l $JOB $SIMID >> "${OUTNAME}" 2>&1
+elif [[ BOOL_RERUN -eq 1 ]]; then 
+	./loadsave.sh -r $RERUN_IT $JOB $SIMID >> "${OUTNAME}" 2>&1
 else 
 	echo "Operation not specified." >> "${OUTNAME}" 2>&1
 	exit $NONZERO_EXITCODE

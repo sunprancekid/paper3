@@ -24,6 +24,9 @@ declare -i BOOL_LOADINIT=0
 declare -i BOOL_LOADLAST=0
 # boolean determining if simulation should be saved
 declare -i BOOL_SAVE=0
+# boolean used to determine if the script is handling a rerun of a previous
+# iteration of the annealing simulation
+declare -i BOOL_RERUN=0
 
 
 ## FUNCTIONS
@@ -31,7 +34,7 @@ declare -i BOOL_SAVE=0
 
 
 ## OPTIONS
-while getopts "ils" option; do
+while getopts "ilsr:" option; do
     case $option in
     	i) # load initial simulation data
 
@@ -45,6 +48,16 @@ while getopts "ils" option; do
 			
 			# boolean determining if simulation should be saved
 			declare -i BOOL_SAVE=1;;
+		r) # save a specific rerun of a previous iteration of an annealing simulation
+
+			# boolean that determines if the the script is handling a previous
+			# iteration of a previous version of the annealing simulation
+			declare -i BOOL_ANNEAL=1
+
+			# the value passed with the flag is the integer corresponding to the 
+			# iteration of the annealing simulation that was rerun and 
+			# that the script is handling
+			declare -i RERUN_IT=${OPTARG};; 
 		\?) # default
 			echo "must declare arguments" ;;
    esac
@@ -96,6 +109,12 @@ elif [[ BOOL_LOADLAST -eq 1 ]]; then
 	echo "${CURRENTTIME}: Copying save files from ./anneal/${NXT_DIR} to ./anneal/tmp/."
 
 	exit 0
-
+elif [[ BOOL_RERUN -eq 1 ]]; then
+	# if rerunning a previous iteration of the annealing simulation
+	# the script simply creates the directory in the temporary annealing
+	# directory, where all of the simulation files will be saved to
+	# once the rerun will be saved to for postscript processing
+	RERUN_DIR=$(printf '%03d' ${RERUN_IT})
+	mkdir -p "./anneal/tmp/${RERUN_DIR}/"
 fi
 
