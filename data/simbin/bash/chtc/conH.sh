@@ -24,7 +24,7 @@ JOB="conH"
 # simulation module title
 SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
-declare -i CELL=15
+declare -i CELL=24
 # starting temperature of annealing simulation
 INIT_ANNEAL_TEMP="3.0"
 # final annealing temperature of an annealing simulation
@@ -49,7 +49,7 @@ declare -i ACHAI_MAX=100
 # between the maxmimum and the minimum
 declare -i ACHAI_INC=25
 # default number of simulation events, unless specified by user
-declare -i EVENTS=100000000
+declare -i EVENTS=200000000
 # default fraction used to decrease simulation temperature
 declare -i FRAC=96
 # number of times that each simulation is repeated
@@ -162,7 +162,7 @@ gensimdir () {
 		genCHTCinit
 
 		# establish the annealing loop node
-		genCHTCanneal -i
+		genCHTCanneal 1
 	else
 
 		# if the directory already exists, determine how many
@@ -195,7 +195,7 @@ gensimdir () {
 			fi
 
 			# establish the annealing loop
-			genCHTCanneal
+			genCHTCanneal 0
 
 			# write the directory of the most recently run annealing
 			# simulation to the tmp directory, for the annealing loop
@@ -340,7 +340,7 @@ genCHTCanneal() {
 	## PARAMETERS
 	# boolean used to determine if the annealing node should have a 
 	# parent child relationship with the initialization node
-	declare -i INIT_BOOL=0
+	declare -i INIT_BOOL=$1
 	# name of file containing submission instructions
 	local SUB_NAME="sub/anneal.sub"
 	# path to file containing submission instructions
@@ -434,6 +434,7 @@ genCHTCanneal() {
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "max_retries = 5" >> $SUB_PATH
 	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
@@ -659,7 +660,7 @@ D0=${JOB}
 D1=${SIM_MOD}_c${CELL}
 
 # establish DAGMAN files
-JOBID="${JOB}_${SIM_MOD}"
+JOBID="${JOB}_${SIM_MOD}c${CELL}"
 DAG="${JOBID}.dag"
 if [[ -f "${DAG}" ]]; then
 	# if the file exists, remove it
