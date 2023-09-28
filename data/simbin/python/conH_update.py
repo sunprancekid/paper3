@@ -13,6 +13,8 @@ import glob
 import matplotlib.pyplot as plt
 
 ## PARAMETERS
+# execute script verbosely
+verbose = True
 # integer the specifies the number of points contained in a data series plot
 max_ds_points = 10000
 
@@ -69,13 +71,14 @@ def plot_temp_time_series (save_path, time, temp):
 	fig = plt.figure()
 	ax = plt.gca()
 	ax.plot(ds_time, ds_temp)
-	# ax.set_xscale('log')
-	plt.ylabel('Simulation Time ($s^{{*}}$)', fontsize=14)
-	plt.xlabel('System Temperature ($T^{{*}}$)', fontsize=14)
+	ax.set_yscale('log')
+	plt.xlabel('Simulation Time ($s^{{*}}$)', fontsize=14)
+	plt.ylabel('System Temperature ($log(T^{{*}})$)', fontsize=14)
 	plt.suptitle('Annealing Simulation Temperature', fontsize=14)
 	# plt.title('($S_{{ub}} = {:.2f}$, $N_{{squares}} = {:d}$)'.format(ub_val, n_squares), fontsize=14)
-	plt.show()
-	exit()
+	# plt.show()
+	plt.savefig(save_path, dpi = 200) # bbox_inches='tight', 
+
 
 # method used to compile results from the simulation, report the current
 # state of the simulation to the user
@@ -150,15 +153,19 @@ def update_simulation_results(sim_dir):
 		for j in range(len(head)):
 			if "NaN" in results[j]:
 				results[j] = "0."
-			prop_dict[head[j]] = float(results[j])
+			if head[j] == 'id':
+				prop_dict[head[j]] = i
+			else:
+				prop_dict[head[j]] = float(results[j])
 
 		# add the dictionary to the next row in the dataframe
 		df = pd.concat([df, pd.DataFrame(prop_dict, index = [i])])
+		# replace id column of current row with current index
 
 	# write the annealing results from each simulation to the simulation
 	# summary file
 	sim_sum_file = sim_dir + "anal/" + jobid + simid + "_sum.csv"
-	df.to_csv(sim_sum_file)
+	df.to_csv(sim_sum_file, index = False)
 
 	# plot the temperature profile of the simulation as a function of the 
 	# simulation time and simulation events
@@ -174,7 +181,7 @@ def update_simulation_results(sim_dir):
 
 	## TODO :: plot properties and fluctuations for all properties (make dict?)
 	## TODO :: return most recent point in data series for sim update file
-	exit()
+	return simid, jobid, prop_dict
 
 
 ## ARGUMENTS
@@ -183,8 +190,11 @@ anal_dir = sys.argv[1]
 
 
 ## SCRIPT
-##  determine the simulation parameters based on the directory hirearchy
+## create data frame which stores results for the simulation
+df_results = pd.DataFrame()
+i = 0 # used to count the number of rows in the data frame
 
+##  determine the simulation parameters based on the directory hirearchy
 # variable that contains the current operating directory
 curr_dir = anal_dir
 
@@ -219,6 +229,30 @@ for achai_val in achai_params:
 			# get the directory corresponding to the simulation density
 			density_dir = "e{:02d}/".format(int(density_val * 100))
 			curr_dir = anal_dir + achai_dir + field_dir + density_dir
+			if verbose:
+				print("Analyzing direction no. {:d} ({:s})".format(i, curr_dir))
 
-			# compile the current results of the simulation
-			update_simulation_results(curr_dir)
+			# compile the current results of the simulation, return sim infor
+			simid, jobid, prop_dict = update_simulation_results(curr_dir)
+
+			# create dictionary containing simulation parameters, add to dataframe
+			sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
+				'field': field_val, 'density': density_val}
+			sim_dict = sim_dict | prop_dict
+			df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
+
+			# increment the number of rows in the data frame
+			i += 1
+
+# using the simulation directories, create phase diagrams for the following conditions
+# AH :: ground-state chirality-field (@ constant density)
+# AD :: ground-state chirality-density (@ constant field)
+# DH :: ground-state density-field (@ constant chirality fraction)
+# DT :: density-temperature (@ constant chirality fraction, constant density)
+# HT :: field-temperature (@ constant chirality fraction, constant density)
+# AT :: chirality-temperature (@ constant field strength, constant density)
+
+
+# print the results as a csv
+# create summary directories file
+df_results.to_csv(anal_dir + jobid + '_update.csv', index = False)
