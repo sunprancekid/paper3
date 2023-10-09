@@ -77,7 +77,8 @@ def plot_temp_time_series (save_path, time, temp):
 	plt.suptitle('Annealing Simulation Temperature', fontsize=14)
 	# plt.title('($S_{{ub}} = {:.2f}$, $N_{{squares}} = {:d}$)'.format(ub_val, n_squares), fontsize=14)
 	# plt.show()
-	plt.savefig(save_path, dpi = 200) # bbox_inches='tight', 
+	plt.savefig(save_path, bbox_inches='tight', dpi = 200) # bbox_inches='tight', 
+	plt.close(fig)
 
 # method used to compile results from the simulation, report the current
 # state of the simulation to the user
