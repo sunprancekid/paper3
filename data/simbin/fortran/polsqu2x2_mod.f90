@@ -247,7 +247,7 @@ integer :: mmiounit = 18
 
 
 ! ** animation settings *************************************
-integer :: moviesph = 0 ! movie making status of simulation as spheres: 0 == off, 1 == on
+integer :: moviesph = 1 ! movie making status of simulation as spheres: 0 == off, 1 == on
 integer :: moviesqu = 1 ! movie making status of simulation as squares: 0 == off, 1 == on
 real(kind=dbl) :: squmovfreq = 200.0 ! frequency to take snapshots of movies [reduced seconds]
 real(kind=dbl) :: sphmovfreq = 200.0 ! frequency to take snapshots of sphere movies
