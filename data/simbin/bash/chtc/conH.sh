@@ -22,7 +22,7 @@ declare -i RERUN_BOOL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
-SIM_MOD="polsqu2x2"
+SIM_MOD="squ2"
 # default simulation cell size, unless overwritten
 declare -i CELL=24
 # starting temperature of annealing simulation
@@ -65,14 +65,26 @@ help () {
 	# if the job already exists, the script skips, unless and overwrite flag is specified
 
 	echo -e "\nScript for generating conH jobs on CHTC systems.\nUSAGE: ./conH.sh << FLAGS >>\n"
-	echo -e " -v           | execute script verbosely"
-	echo -e " -o           | overwrite existing simulation files and directories corresponding to job"
-	echo -e " -s           | submit job to CHTC"
-	echo -e " -r           | rerun anneal simulations that have already been performed."
+	echo -e " -h           | display script options, exit 0."
+	echo -e " -v           | execute script verbosely."
+	echo -e " -o           | boolean determining if existing jobs should be overwritten."
+	echo -e "\n"
+	echo -e " ## JOB PARAMETERS ##"
 	echo -e " -j << ARG >> | specify job title (default is ${JOB})"
-	echo -e " -c << ARG >> | specify simulation cell size (default is ${CELL})"
-	echo -e " -e << ARG >> | specify simulation events (default is ${EVENTS})"
+	echo -e " -c << ARG >> | specify cell size (default is ${CELL})"
+	echo -e " -e << ARG >> | specify events per (default is ${EVENTS})"
 	echo -e " -f << ARG >> | specify annealing fraction (default is ${FRAC})"
+	echo -e "\n"
+	echo -e " ## SIMULATION PARAMETERS ##"
+	echo -e " -g           | boolean determing if simulation parameters / directories should be generated."
+	echo -e " -x << ARG >> | integer(s) representing a-chirality number fracation."
+	echo -e " -h << ARG >> | integer(s) representing external field strength"
+	echo -e " -d << ARG >> | integer(s) representing density as area fraction"
+	echo -e "\n"
+	echo -e " ## CHTC SUBMIT INSTRUCTIONS ##"
+	echo -e " -s           | submit job to CHTC based on current status."
+	echo -e " -t           | \"touch\" simulation directries, update files."
+	echo -e " -r           | rerun anneal simulations that have already been performed."
 }
 
 # script for generating files for annealing simulations
@@ -603,7 +615,7 @@ genCHTCanneal_rerun () {
 
 ## OPTIONS
 # parse options
-while getopts "vosrj:c:e:f:" option; do 
+while getopts "hvosrj:c:e:f:gx:h:p:" option; do 
 	case $option in
 		v) # execute script verbosely
 			
@@ -615,6 +627,11 @@ while getopts "vosrj:c:e:f:" option; do
 			# boolean that determines if the script should
 			# overwrite existing simulation data corresponding to job
 			declare -i OVERWRITE_BOOL=1
+			;;
+		g) # generate simulation directories / parameters 
+			
+			# boolean for generating simulation directories / parameters
+			declare -i GEN_BOOL=1
 			;;
 		s) # submit job to CHTC 
 
@@ -647,6 +664,9 @@ while getopts "vosrj:c:e:f:" option; do
 			# parse the value from the flag arguments
 			declare -i FRAC="${OPTARG}"
 			;;
+		h) # inform user of script flag options
+			help
+			;;
 		\?) # default if illegal argument specified
 			
 			echo -e "\nIllegal argument ${option} specified.\n"
@@ -662,6 +682,10 @@ shift $((OPTIND-1))
 
 
 ## SCRIPT
+# establish initial directories
+D0=${JOB}/${SIM_MOD}_c${CELL}
+JOBID=${JOB}_${SIM_MOD}c${CELL}
+
 ## generate data, if specified
 
 # check if iso-surfaces are specified
@@ -675,21 +699,16 @@ shift $((OPTIND-1))
 # then they should already by in the file
 
 ## start / restart simulations
-# load data from csv
-# loop through each line in file
-# parse simulation parameters
-
-# establish initial directories
-D0=${JOB}
-D1=${SIM_MOD}_c${CELL}
 
 # establish DAGMAN files
-JOBID="${JOB}_${SIM_MOD}c${CELL}"
 DAG="${JOBID}.dag"
 if [[ -f "${DAG}" ]]; then
 	# if the file exists, remove it
 	rm $DAG
 fi
+# load data from csv
+# loop through each line in file
+# parse simulation parameters
 
 # TODO :: incorperate dipole into simulation parameters
 
