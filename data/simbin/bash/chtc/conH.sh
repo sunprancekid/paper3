@@ -662,7 +662,7 @@ shift $((OPTIND-1))
 
 
 ## SCRIPT
-# generate data, if specified
+## generate data, if specified
 
 # check if iso-surfaces are specified
 # if they are not, write list of iso-surfaces
@@ -674,7 +674,8 @@ shift $((OPTIND-1))
 # write parameters to file. if the directories already exist,
 # then they should already by in the file
 
-# load data
+## start / restart simulations
+# load data from csv
 # loop through each line in file
 # parse simulation parameters
 
