@@ -7,6 +7,7 @@ set -e
 
 
 ## PARAMETERS
+## system instructions
 # non-zero exit code that specifies that if error has occured during script execution
 declare -i NONZERO_EXITCODE=120
 # boolean that determines if the verbose flag was specified
@@ -19,6 +20,25 @@ declare -i SUBMIT_BOOL=0
 # boolean that determines if annealing simulations which have
 # already been performed should be rerun
 declare -i RERUN_BOOL=0
+## system instructions - generating simulation parameters
+# boolean determining if simulation directories / parameters should be written
+declare -i GEN_BOOL=0
+# number of replicates to perform per simulation
+declare -i NUM_REPLICATES=3
+# boolean for generating A-chirality fraction simulation space
+declare -i GEN_X_BOOL=0
+# integer value associated with controlled A-chirality fraction isosurface
+declare -i GEN_X_VAL=0
+# boolean for generating external field strength iso-surface
+declare -i GEN_H_BOOL=0
+# integer value associated with controlling external field strength isosurface
+declare -i GEN_H_VAL=0
+# boolean for generating density iso-surface
+declare -i GEN_D_BOOL=0
+# integer value assoicated with controlling density iso-surface
+declare -i GEN_D_VAL=0
+
+## simulation parameters
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
@@ -52,8 +72,6 @@ declare -i ACHAI_INC=25
 declare -i EVENTS=200000000
 # default fraction used to decrease simulation temperature
 declare -i FRAC=96
-# number of times that each simulation is repeated
-declare -i NUM_REPLICATES=3
 # TODO :: replicates are not actually implemented
 
 
@@ -67,6 +85,8 @@ help () {
 	echo -e "\nScript for generating conH jobs on CHTC systems.\nUSAGE: ./conH.sh << FLAGS >>\n"
 	echo -e " -h           | display script options, exit 0."
 	echo -e " -v           | execute script verbosely."
+	echo -e " -g           | boolean determing if simulation parameters / directories should be generated."
+	echo -e " -s           | submit job to CHTC based on current status."
 	echo -e " -o           | boolean determining if existing jobs should be overwritten."
 	echo -e "\n"
 	echo -e " ## JOB PARAMETERS ##"
@@ -76,13 +96,12 @@ help () {
 	echo -e " -f << ARG >> | specify annealing fraction (default is ${FRAC})"
 	echo -e "\n"
 	echo -e " ## SIMULATION PARAMETERS ##"
-	echo -e " -g           | boolean determing if simulation parameters / directories should be generated."
+	echo -e " -r << ARG >> | integer representing the number of replicates to perform (default is 1)."
 	echo -e " -x << ARG >> | integer(s) representing a-chirality number fracation."
 	echo -e " -h << ARG >> | integer(s) representing external field strength"
 	echo -e " -d << ARG >> | integer(s) representing density as area fraction"
 	echo -e "\n"
 	echo -e " ## CHTC SUBMIT INSTRUCTIONS ##"
-	echo -e " -s           | submit job to CHTC based on current status."
 	echo -e " -t           | \"touch\" simulation directries, update files."
 	echo -e " -r           | rerun anneal simulations that have already been performed."
 }
@@ -682,18 +701,27 @@ shift $((OPTIND-1))
 
 
 ## SCRIPT
-# establish initial directories
+exit 0 # do not exectue script for now
+# establish initial directories, file names
 D0=${JOB}/${SIM_MOD}_c${CELL}
 JOBID=${JOB}_${SIM_MOD}c${CELL}
+# name of file containing isosurfaces (used later in analysis)
+SIMPARAM_FILE=${JOBID}.csv
+ISOSURF_FILE=${JOBID}_ISOSURF.csv
+
 
 ## generate data, if specified
+if [[ GEN_BOOL -eq 1 ]]; then
+	# TODO :: put this part in a seperate method
+	# (eventually this could become a seperate python call?)
 
-# check if iso-surfaces are specified
-# if they are not, write list of iso-surfaces
+	# check if iso-surfaces are specified
+	# if they are not, write list of iso-surfaces
 
-# if they are, check the number of replicates
+	# if they are, check the number of replicates
 
-# generate directories, if they do not already exist
+	# generate directories, if they do not already exist
+fi 
 
 # write parameters to file. if the directories already exist,
 # then they should already by in the file
