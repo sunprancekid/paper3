@@ -179,6 +179,13 @@ gensimdir () {
 			# if no annealing simulations have been performed
 			# establish the initial annealing
 			echo "No annealing simulations have been performed"
+
+			# perform the same routine, as if initializing the simulation
+			# establish the initialization node
+			genCHTCinit
+
+			# establish the annealing loop node
+			genCHTCanneal 1
 		else
 			# inform the user of the annealing simulations that
 			# have been performed already
@@ -199,9 +206,9 @@ gensimdir () {
 
 			# write the directory of the most recently run annealing
 			# simulation to the tmp directory, for the annealing loop
-			echo $(printf '%03d' ${N_ANNEAL}) > "${D}anneal/tmp/next_dir.txt"
+			echo ${N_ANNEAL} > "${D}anneal/tmp/next_dir.txt"
 
-			exit 0
+			# exit 0
 
 		fi
 	fi
@@ -655,6 +662,22 @@ shift $((OPTIND-1))
 
 
 ## SCRIPT
+# generate data, if specified
+
+# check if iso-surfaces are specified
+# if they are not, write list of iso-surfaces
+
+# if they are, check the number of replicates
+
+# generate directories, if they do not already exist
+
+# write parameters to file. if the directories already exist,
+# then they should already by in the file
+
+# load data
+# loop through each line in file
+# parse simulation parameters
+
 # establish initial directories
 D0=${JOB}
 D1=${SIM_MOD}_c${CELL}

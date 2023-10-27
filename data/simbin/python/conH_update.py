@@ -77,8 +77,8 @@ def plot_temp_time_series (save_path, time, temp):
 	plt.suptitle('Annealing Simulation Temperature', fontsize=14)
 	# plt.title('($S_{{ub}} = {:.2f}$, $N_{{squares}} = {:d}$)'.format(ub_val, n_squares), fontsize=14)
 	# plt.show()
-	plt.savefig(save_path, dpi = 200) # bbox_inches='tight', 
-
+	plt.savefig(save_path, bbox_inches='tight', dpi = 200) # bbox_inches='tight', 
+	plt.close(fig)
 
 # method used to compile results from the simulation, report the current
 # state of the simulation to the user
@@ -230,7 +230,7 @@ for achai_val in achai_params:
 			density_dir = "e{:02d}/".format(int(density_val * 100))
 			curr_dir = anal_dir + achai_dir + field_dir + density_dir
 			if verbose:
-				print("Analyzing direction no. {:d} ({:s})".format(i, curr_dir))
+				print("Summarizing directory no. {:d} ({:s})".format(i, curr_dir))
 
 			# compile the current results of the simulation, return sim infor
 			simid, jobid, prop_dict = update_simulation_results(curr_dir)
@@ -245,14 +245,11 @@ for achai_val in achai_params:
 			i += 1
 
 # using the simulation directories, create phase diagrams for the following conditions
-# AH :: ground-state chirality-field (@ constant density)
-# AD :: ground-state chirality-density (@ constant field)
-# DH :: ground-state density-field (@ constant chirality fraction)
-# DT :: density-temperature (@ constant chirality fraction, constant density)
-# HT :: field-temperature (@ constant chirality fraction, constant density)
-# AT :: chirality-temperature (@ constant field strength, constant density)
 
 
 # print the results as a csv
 # create summary directories file
-df_results.to_csv(anal_dir + jobid + '_update.csv', index = False)
+if not os.path.exists(anal_dir + "summary/"):
+	os.mkdir(anal_dir + "summary/")
+# write the sim status file to the summary directory
+df_results.to_csv(anal_dir+ "summary/status.csv", index = False)
