@@ -59,12 +59,53 @@ help () {
 }
 
 # generates simulation parameters for a constant field strength
+gen_conH () {
 
+	## PARAMETERS
+	# none
+
+	## OPTIONS
+	# none
+
+	## ARGUMENTS 
+	# none
+
+	## SCRIPT 
+	# none
+}
 
 # generates simulation parameters for a constant density
+gen_conXA () {
 
+	## PARAMETERS
+	# none
+
+	## OPTIONS
+	# none
+
+	## ARGUMENTS 
+	# none
+
+	## SCRIPT 
+	# none
+}
 
 # generates simulation parameters for a constant A-chirality fraction
+gen_conETA () {
+
+	## PARAMETERS
+	# none
+
+	## OPTIONS
+	# none
+
+	## ARGUMENTS 
+	# none
+
+	## SCRIPT
+	# none
+}
+
 
 
 ## OPTIONS
@@ -156,8 +197,32 @@ shift $((OPTIND-1))
 
 
 ## ARGUMENTS
-# none
+# first argument :: job id
+JOBID=$1
+# second argument :: simulation id
+SIMID=$2
 
 
 ## SCRIPT
-# none
+## check that the simulation directories and files exist
+# TODO :: check that the main simulation directory exists
+# TODO :: check that the summary directory exists
+
+## according to the options that were called, generate simulation parameteres
+# constant field simulations
+if [[ FIELD_BOOL -eq 1 ]]; then 
+	# generate constant field surface corresponding to integer passed to the script
+	## TODO :: write subroutine for generating constant field simulation parameters
+fi 
+
+# constant density simulations
+if [[ ETA_BOOL -eq 1 ]]; then
+	# generate constant density surface corresponding to the integer passed to the script
+	## TODO :: write subroutine for generating constant density simulation parameters
+fi
+
+# constant a-chirality fraction simulations
+if [[ XA_BOOL -eq 1 ]]; then 
+	# generate constant a-chirality fraction surface corresponding to the integer passed to the script
+	## TODO :: write subroutine for generating constant a-chirality fraction simulation parameters
+fi
