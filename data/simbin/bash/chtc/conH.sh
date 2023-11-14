@@ -98,8 +98,8 @@ help () {
 	echo -e " ## SIMULATION PARAMETERS ##"
 	echo -e " -r << ARG >> | integer representing the number of replicates to perform (default is 1)."
 	echo -e " -x << ARG >> | integer(s) representing a-chirality number fracation."
-	echo -e " -h << ARG >> | integer(s) representing external field strength"
-	echo -e " -d << ARG >> | integer(s) representing density as area fraction"
+	echo -e " -h << ARG >> | integer(s) representing external field strength."
+	echo -e " -d << ARG >> | integer(s) representing density as area fraction."
 	echo -e "\n"
 	echo -e " ## CHTC SUBMIT INSTRUCTIONS ##"
 	echo -e " -t           | \"touch\" simulation directries, update files."
@@ -712,10 +712,24 @@ ISOSURF_FILE=${JOBID}_ISOSURF.csv
 
 ## generate data, if specified
 if [[ GEN_BOOL -eq 1 ]]; then
+
+	# check if the directory corresponding to the jobid exists
+	if [ ! -d $D0 ]; then 
+		mkdir $D0
+	fi
+
+	# check if the file containing the simulation parameters exists
+	if [ ! -f $SIMPARAM_FILE ]; then 
+		touch $SIMPARAM_FILE
+	fi
+
+	# generate the simulation parameters, directories corresponding 
+	# to the specified surface
+
 	# TODO :: put this part in a seperate method
 	# (eventually this could become a seperate python call?)
 
-	# check if iso-surfaces are specified
+	# check if iso-surfaces are specified (do the directories exist?)
 	# if they are not, write list of iso-surfaces
 
 	# if they are, check the number of replicates
