@@ -7,7 +7,7 @@ set -e
 
 ## PARAMETERS
 # header for simulation parameter file
-HEADER="jobid,simid,H,ETA,XA,RP,path"
+HEADER="jobid,simid,XA,H,ETA,RP,path"
 # boolean that determines if the script should be executed verbosely
 declare -i VERB_BOOL=0
 # default number of replicates
@@ -21,7 +21,7 @@ declare -i FIELD_MIN=0
 # maximum field strength
 declare -i FIELD_MAX=20
 # amount the external field strength is incremented by
-declare -i FIELD_INC=1
+declare -i FIELD_INC=2
 
 ## DENSITY PARAMETERS
 # boolean indicating that a constant density value was specified
@@ -85,7 +85,7 @@ get_simpath () {
 	D1=$(printf '%03d' ${XA})
 	D1="a${D1}"
 	# second directory correspond to the external field strength
-	D2=$(printf '%03d' ${H})
+	D2=$(printf '%02d' ${H})
 	D2="h${D2}"
 	# third directory correspond to the a-chirality fraction
 	D3=$(printf '%02d' ${ETA})
@@ -117,8 +117,8 @@ gen_conH () {
 
 	## SCRIPT 
 	# establish the constant field strength value as a floating point value
-	H_STRING=$(printf '%03d' ${H})
-	H_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
+	H_STRING=$(printf '%02d' ${H_INT})
+	H_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${H_INT} / 100 }"))
 	# establish the directory that contains the simulation parameters for constant field strength
 	H_FILE=${D0}/summary/H
 	if [[ ! -d ${H_FILE} ]]; then
@@ -126,13 +126,13 @@ gen_conH () {
 		mkdir $H_FILE
 	fi
 	# establish the file that contains the simulation parameters for the constant field strength value
-	H_FILE=${D0}/summary/H/${JOB}_${H_STRING}.csv
+	H_FILE=${D0}/summary/H/${JOB}_h${H_STRING}.csv
 	if [[ ! -f $H_FILE ]]; then
 		# if the file does not exist, write the header to the file
 		echo $HEADER > $H_FILE
 	fi
 	# inform the user
-	echo -e "conH_simparam :: Generating simulations for constant field strength of ${H_VALUE} (${REPLICATES} replicates)."
+	echo -e "\nconH_simparam :: Generating simulations for constant field strength of ${H_VALUE} (${REPLICATES} replicates)."
 
 	# loop through all densities and a-chirality fraction values, write to file
 	# start with the a-chirality fraction
@@ -151,7 +151,7 @@ gen_conH () {
 
 			# loop through replicates
 			declare -i R=0
-			while [[ R -lt $REPLICATES ]]; then 
+			while [[ $R -lt $REPLICATES ]]; do 
 
 				# determine the directory path based on the simulation parameters / replicates
 				SIMDIR=$(get_simpath $XA_INT $H_INT $ETA_INT $R) 
@@ -165,7 +165,7 @@ gen_conH () {
 						echo "conH_simparam :: Establishing $SIMDIR .."
 					fi
 					# if it does not, initialize the path to the directory
-					mkdir $SIMDIR
+					# mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
 					# write the parameters to the main simulation parameter file
 					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
 					# write the simulation parameters to the conH file
@@ -177,10 +177,12 @@ gen_conH () {
 					fi
 				fi
 
+				((R+=1))
 			done
+			((ETA_INT+=ETA_INC))
 		done
+		((XA_INT+=XA_INC))
 	done
-
 }
 
 # generates simulation parameters for a constant density
@@ -193,13 +195,79 @@ gen_conXA () {
 	# none
 
 	## ARGUMENTS 
-	# none
+	# first argument :: integer corresponding to the constant a-chirality fraction value
+	declare -i XA_INT=$1
 
 	## SCRIPT 
-	# none
+	# establish the constant field strength value as a floating point value
+	XA_STRING=$(printf '%03d' ${XA_INT})
+	XA_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${XA_INT} / 100 }"))
+	# establish the directory that contains the simulation parameters for constant field strength
+	XA_FILE=${D0}/summary/XA
+	if [[ ! -d ${XA_FILE} ]]; then
+		# make the directory if it does not exist
+		mkdir $XA_FILE
+	fi
+	# establish the file that contains the simulation parameters for the constant field strength value
+	XA_FILE=${D0}/summary/XA/${JOB}_a${XA_STRING}.csv
+	if [[ ! -f $XA_FILE ]]; then
+		# if the file does not exist, write the header to the file
+		echo $HEADER > $XA_FILE
+	fi
+	# inform the user
+	echo -e "\nconH_simparam :: Generating simulations for a-chirality fraction value of ${XA_VALUE} (${REPLICATES} replicates)."
+
+	# loop through all external field strengths and density values, write to file
+	# start with the external field strength
+	declare -i H_INT=$FIELD_MIN 
+	while [[  H_INT -le FIELD_MAX ]]; do
+
+		# establish the field strength value
+		H_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${H_INT} / 100 }"))
+
+		# then loop through all densities
+		declare -i ETA_INT=$ETA_MIN
+		while [[ ETA_INT -le ETA_MAX ]]; do
+
+			# establish the density value
+			ETA_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${ETA_INT} / 100 }"))
+
+			# loop through replicates
+			declare -i R=0
+			while [[ $R -lt $REPLICATES ]]; do 
+
+				# determine the directory path based on the simulation parameters / replicates
+				SIMDIR=$(get_simpath $XA_INT $H_INT $ETA_INT $R) 
+				# establish the simulation parameter string
+				SIMPARAM_STRING="${JOBID},${SIMID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
+
+				# check if the directory exists
+				if [[ ! -d $SIMDIR ]]; then
+					if [[ VERB_BOOL -eq 1 ]]; then
+						echo "conH_simparam :: Establishing $SIMDIR .."
+					fi
+					# if it does not, initialize the path to the directory
+					# mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
+					# write the parameters to the main simulation parameter file
+					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
+					# write the simulation parameters to the conH file
+					echo $SIMPARAM_STRING >> $XA_FILE
+				else
+					# if the directory does exist, the parameter should already be stored in the main sim param file
+					if [[ VERB_BOOL -eq 1 ]]; then
+						echo "conH_simparam :: $SIMDIR has already been established .."
+					fi
+				fi
+
+				((R+=1))
+			done
+			((ETA_INT+=ETA_INC))
+		done
+		((H_INT+=FIELD_INC))
+	done
 }
 
-# generates simulation parameters for a constant A-chirality fraction
+# # generates simulation parameters for a constant density value
 gen_conETA () {
 
 	## PARAMETERS
@@ -208,11 +276,81 @@ gen_conETA () {
 	## OPTIONS
 	# none
 
-	## ARGUMENTS 
-	# none
+	# TODO :: add options to specify an a-chirality fraction value
+	# TODO :: add options to specify an external field strength
 
-	## SCRIPT
-	# none
+	## ARGUMENTS 
+	# first argument :: integer corresponding to the constant density value
+	declare -i ETA_INT=$1
+
+	## SCRIPT 
+	# establish the constant field strength value as a floating point value
+	ETA_STRING=$(printf '%02d' ${ETA_INT})
+	ETA_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${ETA_INT} / 100 }"))
+	# establish the directory that contains the simulation parameters for constant field strength
+	ETA_FILE=${D0}/summary/ETA
+	if [[ ! -d ${ETA_FILE} ]]; then
+		# make the directory if it does not exist
+		mkdir $ETA_FILE
+	fi
+	# establish the file that contains the simulation parameters for the constant field strength value
+	ETA_FILE=${D0}/summary/ETA/${JOB}_e${ETA_STRING}.csv
+	if [[ ! -f $ETA_FILE ]]; then
+		# if the file does not exist, write the header to the file
+		echo $HEADER > $ETA_FILE
+	fi
+	# inform the user
+	echo -e "\nconH_simparam :: Generating simulations for constant density of ${ETA_VALUE} (${REPLICATES} replicates)."
+
+	# loop through all densities and a-chirality fraction values, write to file
+	# start with the a-chirality fraction
+	declare -i XA_INT=$XA_MIN 
+	while [[  XA_INT -le XA_MAX ]]; do
+
+		# establish the achirality value
+		XA_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${XA_INT} / 100 }"))
+
+		# then loop through all densities
+		declare -i H_INT=$FIELD_MIN
+		while [[ H_INT -le FIELD_MAX ]]; do
+
+			# establish the density value
+			H_VALUE=$(printf '%3.2f' $(awk "BEGIN { print ${H_INT} / 100 }"))
+
+			# loop through replicates
+			declare -i R=0
+			while [[ $R -lt $REPLICATES ]]; do 
+
+				# determine the directory path based on the simulation parameters / replicates
+				SIMDIR=$(get_simpath $XA_INT $H_INT $ETA_INT $R) 
+				# establish the simulation parameter string
+				SIMPARAM_STRING="${JOBID},${SIMID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
+
+
+				# check if the directory exists
+				if [[ ! -d $SIMDIR ]]; then
+					if [[ VERB_BOOL -eq 1 ]]; then
+						echo "conH_simparam :: Establishing $SIMDIR .."
+					fi
+					# if it does not, initialize the path to the directory
+					# mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
+					# write the parameters to the main simulation parameter file
+					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
+					# write the simulation parameters to the conH file
+					echo $SIMPARAM_STRING >> $ETA_FILE
+				else
+					# if the directory does exist, the parameter should already be stored in the main sim param file
+					if [[ VERB_BOOL -eq 1 ]]; then
+						echo "conH_simparam :: $SIMDIR has already been established .."
+					fi
+				fi
+
+				((R+=1))
+			done
+			((H_INT+=FIELD_INC))
+		done
+		((XA_INT+=XA_INC))
+	done
 }
 
 
@@ -317,7 +455,7 @@ SIMID=$2
 #  check that the main simulation directory exists
 D0=${JOBID}/${SIMID}
 if [[ ! -d $D0 ]]; then 
-	mkdir $D0
+	mkdir -p $D0
 fi
 # check that the summary directory exists
 if [[ ! -d "${D0}/summary" ]]; then
@@ -325,7 +463,7 @@ if [[ ! -d "${D0}/summary" ]]; then
 fi
 # establish the file name that contains simulation parameters for all jobs
 JOB=${JOBID}_${SIMID}
-SIMPARAM_FILE=${JOB}.csv
+SIMPARAM_FILE=${D0}/${JOB}.csv
 if [[ ! -f $SIMPARAM_FILE ]]; then 
 	# if the file does not exists, inform the user and write the header to the file
 	echo -e "conH_simparam :: Initializing simulation parameter file for $JOB."
@@ -342,13 +480,11 @@ fi
 # constant density simulations
 if [[ ETA_BOOL -eq 1 ]]; then
 	# generate constant density surface corresponding to the integer passed to the script
-	## TODO :: write subroutine for generating constant density simulation parameters
-	echo "conH_simparam :: TODO :: write subroutine for generating constant density simulation parameters."
+	gen_conETA $ETA
 fi
 
 # constant a-chirality fraction simulations
 if [[ XA_BOOL -eq 1 ]]; then 
 	# generate constant a-chirality fraction surface corresponding to the integer passed to the script
-	## TODO :: write subroutine for generating constant a-chirality fraction simulation parameters
-	echo "conH_simparam :: TODO :: write subroutine for generating constant a-chirality fraction simulation parameters."
+	gen_conXA $XA
 fi
