@@ -99,6 +99,47 @@ get_simpath () {
 	echo $DIR
 }
 
+# method generates a simulation directory that corresponds to the simulation
+# parameters that are passed to the method. the method is use to control the generation
+# of annealing ids and used by all other methods in the script
+get_annealid () {
+
+	## PARAMETERS
+	# none
+
+	## OPTIONS
+	# none
+
+	## ARGUMENTS
+	# first parameter :: integer representing the a-chirality fraction of the system
+	declare -i XA=$1
+	# second parameter :: integer representing the external field strength of the simulation
+	declare -i H=$2
+	# third parameter :: integer representing the system density
+	declare -i ETA=$3
+	# fourth parameter :: integer representing the number of replicates performed
+	declare -i REP=$4
+
+	## SCRIPT
+	# translate the integers to a formatted string
+	# first directory corresponds to the a-chirality fraction
+	D1=$(printf '%03d' ${XA})
+	D1="a${D1}"
+	# second directory correspond to the external field strength
+	D2=$(printf '%02d' ${H})
+	D2="h${D2}"
+	# third directory correspond to the a-chirality fraction
+	D3=$(printf '%02d' ${ETA})
+	D3="e${D3}"
+	# fourth directory is the number of replicates
+	# D4=$(printf '%02d' ${REP})
+	# D4="r${D4}"
+
+	# generate the directory and return to user
+	local ID=${D1}${D2}${D3}
+	echo $ID
+}
+
 # generates simulation parameters for a constant field strength
 gen_conH () {
 
@@ -132,7 +173,7 @@ gen_conH () {
 		echo $HEADER > $H_FILE
 	fi
 	# inform the user
-	echo -e "\nconH_simparam :: Generating simulations for constant field strength of ${H_VALUE} (${REPLICATES} replicates)."
+	echo -e "conH_simparam :: Generating simulations for constant field strength of ${H_VALUE} (${REPLICATES} replicates)."
 
 	# loop through all densities and a-chirality fraction values, write to file
 	# start with the a-chirality fraction
@@ -155,8 +196,10 @@ gen_conH () {
 
 				# determine the directory path based on the simulation parameters / replicates
 				SIMDIR=$(get_simpath $XA_INT $H_INT $ETA_INT $R) 
+				# determine the annealing id based on the simulation parameters
+				ANNEALID=$(get_annealid $XA_INT $H_INT $ETA_INT $R)
 				# establish the simulation parameter string
-				SIMPARAM_STRING="${JOBID},${SIMID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
+				SIMPARAM_STRING="${JOB},${ANNEALID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
 
 
 				# check if the directory exists
@@ -165,7 +208,7 @@ gen_conH () {
 						echo "conH_simparam :: Establishing $SIMDIR .."
 					fi
 					# if it does not, initialize the path to the directory
-					# mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
+					mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
 					# write the parameters to the main simulation parameter file
 					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
 					# write the simulation parameters to the conH file
@@ -215,7 +258,7 @@ gen_conXA () {
 		echo $HEADER > $XA_FILE
 	fi
 	# inform the user
-	echo -e "\nconH_simparam :: Generating simulations for a-chirality fraction value of ${XA_VALUE} (${REPLICATES} replicates)."
+	echo -e "conH_simparam :: Generating simulations for a-chirality fraction value of ${XA_VALUE} (${REPLICATES} replicates)."
 
 	# loop through all external field strengths and density values, write to file
 	# start with the external field strength
@@ -238,8 +281,10 @@ gen_conXA () {
 
 				# determine the directory path based on the simulation parameters / replicates
 				SIMDIR=$(get_simpath $XA_INT $H_INT $ETA_INT $R) 
+				# determine the annealing id based on the simulation parameters
+				ANNEALID=$(get_annealid $XA_INT $H_INT $ETA_INT $R)
 				# establish the simulation parameter string
-				SIMPARAM_STRING="${JOBID},${SIMID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
+				SIMPARAM_STRING="${JOB},${ANNEALID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
 
 				# check if the directory exists
 				if [[ ! -d $SIMDIR ]]; then
@@ -247,7 +292,7 @@ gen_conXA () {
 						echo "conH_simparam :: Establishing $SIMDIR .."
 					fi
 					# if it does not, initialize the path to the directory
-					# mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
+					mkdir -p $SIMDIR # directories are generated in the conH submssion / analysis script
 					# write the parameters to the main simulation parameter file
 					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
 					# write the simulation parameters to the conH file
@@ -300,7 +345,7 @@ gen_conETA () {
 		echo $HEADER > $ETA_FILE
 	fi
 	# inform the user
-	echo -e "\nconH_simparam :: Generating simulations for constant density of ${ETA_VALUE} (${REPLICATES} replicates)."
+	echo -e "conH_simparam :: Generating simulations for constant density of ${ETA_VALUE} (${REPLICATES} replicates)."
 
 	# loop through all densities and a-chirality fraction values, write to file
 	# start with the a-chirality fraction
@@ -323,8 +368,10 @@ gen_conETA () {
 
 				# determine the directory path based on the simulation parameters / replicates
 				SIMDIR=$(get_simpath $XA_INT $H_INT $ETA_INT $R) 
+				# determine the annealing id based on the simulation parameters
+				ANNEALID=$(get_annealid $XA_INT $H_INT $ETA_INT $R)
 				# establish the simulation parameter string
-				SIMPARAM_STRING="${JOBID},${SIMID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
+				SIMPARAM_STRING="${JOB},${ANNEALID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
 
 
 				# check if the directory exists
@@ -333,7 +380,7 @@ gen_conETA () {
 						echo "conH_simparam :: Establishing $SIMDIR .."
 					fi
 					# if it does not, initialize the path to the directory
-					# mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
+					mkdir -p $SIMDIR # directories are generated in the conH submission / analysis script
 					# write the parameters to the main simulation parameter file
 					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
 					# write the simulation parameters to the conH file
