@@ -7,6 +7,7 @@ set -e
 
 
 ## PARAMETERS
+## system instructions
 # non-zero exit code that specifies that if error has occured during script execution
 declare -i NONZERO_EXITCODE=120
 # boolean that determines if the verbose flag was specified
@@ -19,41 +20,39 @@ declare -i SUBMIT_BOOL=0
 # boolean that determines if annealing simulations which have
 # already been performed should be rerun
 declare -i RERUN_BOOL=0
+## system instructions - generating simulation parameters
+# boolean determining if simulation directories / parameters should be written
+declare -i GEN_BOOL=0
+# boolean for generating A-chirality fraction simulation space
+declare -i GEN_X_BOOL=0
+# integer value associated with controlled A-chirality fraction isosurface
+declare -i GEN_X_VAL=0
+# boolean for generating external field strength iso-surface
+declare -i GEN_H_BOOL=0
+# integer value associated with controlling external field strength isosurface
+declare -i GEN_H_VAL=0
+# boolean for generating density iso-surface
+declare -i GEN_D_BOOL=0
+# integer value assoicated with controlling density iso-surface
+declare -i GEN_D_VAL=0
+
+## simulation parameters
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
-SIM_MOD="polsqu2x2"
+SIM_MOD="squ2"
 # default simulation cell size, unless overwritten
-declare -i CELL=24
+declare -i CELL=32
 # starting temperature of annealing simulation
 INIT_ANNEAL_TEMP="3.0"
 # final annealing temperature of an annealing simulation
 FINAL_ANNEAL_TEMP="0.01"
-# minimum field strength used for simulations
-declare -i FIELD_MIN=0
-# maximum field strength used for simulations
-declare -i FIELD_MAX=20
-# integer used to increment the field by between maximum and minimum
-declare -i FIELD_INC=2
-# minimum value used for density
-declare -i ETA_MIN=5
-# maximum value used for density
-declare -i ETA_MAX=60
-# integer amount to increment density by between maximum and minimum
-declare -i ETA_INC=5
-# minimum fraction of a-chirality squares used in simulations
-declare -i ACHAI_MIN=50
-# maximum fraction of a-chirality squares used in simulations
-declare -i ACHAI_MAX=100
-# integer amount to increment fraction of a-chirality squares by
-# between the maxmimum and the minimum
-declare -i ACHAI_INC=25
+# number of replicates to perform per simulation
+declare -i NUM_REPLICATES=3
 # default number of simulation events, unless specified by user
-declare -i EVENTS=200000000
+declare -i EVENTS=250000000
 # default fraction used to decrease simulation temperature
 declare -i FRAC=96
-# number of times that each simulation is repeated
-declare -i NUM_REPLICATES=3
 # TODO :: replicates are not actually implemented
 
 
@@ -65,14 +64,24 @@ help () {
 	# if the job already exists, the script skips, unless and overwrite flag is specified
 
 	echo -e "\nScript for generating conH jobs on CHTC systems.\nUSAGE: ./conH.sh << FLAGS >>\n"
-	echo -e " -v           | execute script verbosely"
-	echo -e " -o           | overwrite existing simulation files and directories corresponding to job"
-	echo -e " -s           | submit job to CHTC"
-	echo -e " -r           | rerun anneal simulations that have already been performed."
+	echo -e " -h           | display script options, exit 0."
+	echo -e " -v           | execute script verbosely."
+	echo -e " -g           | boolean determing if simulation parameters / directories should be generated."
+	echo -e " -s           | submit job to CHTC based on current status."
+	echo -e " -o           | boolean determining if existing jobs should be overwritten."
+	echo -e "\n"
+	echo -e " ## JOB PARAMETERS ##"
 	echo -e " -j << ARG >> | specify job title (default is ${JOB})"
-	echo -e " -c << ARG >> | specify simulation cell size (default is ${CELL})"
-	echo -e " -e << ARG >> | specify simulation events (default is ${EVENTS})"
+	echo -e " -c << ARG >> | specify cell size (default is ${CELL})"
+	echo -e " -e << ARG >> | specify events per (default is ${EVENTS})"
 	echo -e " -f << ARG >> | specify annealing fraction (default is ${FRAC})"
+	echo -e "\n"
+	echo -e " ## SIMULATION PARAMETERS ##"
+	echo -e " -r << ARG >> | integer representing the number of replicates to perform (default is 1)."
+	echo -e "\n"
+	echo -e " ## CHTC SUBMIT INSTRUCTIONS ##"
+	echo -e " -t           | \"touch\" simulation directries, update files."
+	echo -e " -r           | rerun anneal simulations that have already been performed."
 }
 
 # script for generating files for annealing simulations
@@ -90,13 +99,13 @@ gensimdir () {
 
 	## PARAMETERS - SIMULATION VARIABLES
 	# area fraction value
-	local AF_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ETA} / 100 }"))
+	local AF_VAL=$ETA_VAL
 	# cell size value - related to the number of particles in the simulation
 	local CELL_VAL=${CELL}
 	# a-chirality square number fraction
-	local ACHAI_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${ACHAI} / 100 }"))
+	local ACHAI_VAL=$XA_VAL
 	# external field value
-	local FIELD_VAL=$(printf '%3.2f' $(awk "BEGIN { print ${FIELD} / 100 }"))
+	local FIELD_VAL=$H_VAL
 	# inital temperature assigned to simulation
 	local INIT_TEMP=$INIT_ANNEAL_TEMP
 	# annealing fraction of simulation
@@ -122,12 +131,12 @@ gensimdir () {
 
 	# check if directory already exists
 	declare -i GEN_DIR=0
-	if [[ -d "${D}" ]]; then 
-		# if the directory exists
+	if [[ -f "${D}/${SUBDAG}" ]]; then 
+		# if the subdag exists, then the directory has been initialized
 		# check if the directory should be over written
 		if [[ OVERWRITE_BOOL -eq 1 ]]; then 
 			declare -i GEN_DIR=1
-			rm -r "${D}"
+			rm -r ${D}/* # empty the directory and restart
 			# inform user 
 			if [[ VERB_BOOL -eq 1 ]]; then
 				echo "Directory already exists. Overwriting .."
@@ -139,7 +148,8 @@ gensimdir () {
 			fi
 		fi
 	else
-		# if the directory does not exist
+		# otherwise, if the subdag has not been created
+		# then the directory has not been initialized
 		declare	-i GEN_DIR=1
 		# inform the user
 		if [[ VERB_BOOL -eq 1 ]]; then 
@@ -603,7 +613,7 @@ genCHTCanneal_rerun () {
 
 ## OPTIONS
 # parse options
-while getopts "vosrj:c:e:f:" option; do 
+while getopts "hvosrj:c:e:f:gx:h:p:" option; do 
 	case $option in
 		v) # execute script verbosely
 			
@@ -614,7 +624,13 @@ while getopts "vosrj:c:e:f:" option; do
 			
 			# boolean that determines if the script should
 			# overwrite existing simulation data corresponding to job
-			declare -i OVERWRITE_BOOL=1
+			declare -i OVERWRITE_BOOL=0
+			# declare -i OVERWRITE_BOOL=1
+			;;
+		g) # generate simulation directories / parameters 
+			
+			# boolean for generating simulation directories / parameters
+			declare -i GEN_BOOL=1
 			;;
 		s) # submit job to CHTC 
 
@@ -647,6 +663,9 @@ while getopts "vosrj:c:e:f:" option; do
 			# parse the value from the flag arguments
 			declare -i FRAC="${OPTARG}"
 			;;
+		h) # inform user of script flag options
+			help
+			;;
 		\?) # default if illegal argument specified
 			
 			echo -e "\nIllegal argument ${option} specified.\n"
@@ -662,88 +681,76 @@ shift $((OPTIND-1))
 
 
 ## SCRIPT
-## generate data, if specified
-
-# check if iso-surfaces are specified
-# if they are not, write list of iso-surfaces
-
-# if they are, check the number of replicates
-
-# generate directories, if they do not already exist
-
-# write parameters to file. if the directories already exist,
-# then they should already by in the file
-
-## start / restart simulations
-# load data from csv
-# loop through each line in file
-# parse simulation parameters
-
-# establish initial directories
-D0=${JOB}
-D1=${SIM_MOD}_c${CELL}
-
+# establish initial directories, file names
+SIMID=${SIM_MOD}_c${CELL}
+D0=${JOB}/${SIMID}
+JOBID=${JOB}_${SIMID}
+# name of file containing simulation parameters
+SIMPARAM_FILE=${D0}/${JOBID}.csv
 # establish DAGMAN files
-JOBID="${JOB}_${SIM_MOD}c${CELL}"
 DAG="${JOBID}.dag"
 if [[ -f "${DAG}" ]]; then
 	# if the file exists, remove it
 	rm $DAG
 fi
 
-# TODO :: incorperate dipole into simulation parameters
 
-# loop through simulation parameters
-# first parameters is the achirality fraction of squares
-declare -i ACHAI=$ACHAI_MIN
-while [[  ACHAI -le ACHAI_MAX ]]; do
+## generate data, if specified
+if [[ GEN_BOOL -eq 1 ]]; then
 
-	# establish the achirality directory
-	ACHAI_STRING=$(printf '%03d' ${ACHAI})
-	D2="a${ACHAI_STRING}"
+	# TODO :: incorperate dipole into simulation parameters
+	if [[ VERB_BOOL -eq 1 ]]; then 
+		echo -e "\nconH :: Generating simulation parameters."
+	fi
+	# generate specified simulation parameters
+	./simbin/bash/chtc/conH_simparam.sh -x 50 -r $NUM_REPLICATES $JOB $SIMID
+	./simbin/bash/chtc/conH_simparam.sh -x 75 -r $NUM_REPLICATES $JOB $SIMID
+	./simbin/bash/chtc/conH_simparam.sh -x 100 -r $NUM_REPLICATES $JOB $SIMID
+fi 
 
-	# second simulation parameters is the external field strength
-	declare -i FIELD=$FIELD_MIN
-	while [[ FIELD -le FIELD_MAX ]]; do
+# write parameters to file. if the directories already exist,
+# then they should already by in the file
 
-		# establish the field directory
-		FIELD_STRING=$(printf '%02d' ${FIELD})
-		D3="h${FIELD_STRING}"
+## start / restart simulations
+if [[ VERB_BOOL -eq 1 ]]; then
+	echo -e "\nconH :: Parsing simulation parameters."
+fi
+# load data from csv
+# get the number of lines in the sim parameter directory
+declare -i N_LINES=$(./simbin/bash/util/parse_csv.sh -l -f ${SIMPARAM_FILE})
+# loop through each line in file
+# parse simulation parameters
+declare -i LINE=2 # first line is the header
+while [[ LINE -le N_LINES ]]
+do
 
-		# third simulation parameter is the system density
-		declare -i ETA=$ETA_MIN
-		while [[ ETA -le ETA_MAX ]]; do 
+	# parse the simulation data
+	# simulation parameters
+	SIMPARM="$( head -n ${LINE} ${SIMPARAM_FILE} | tail -n 1 )"
 
-			# establish the density directory
-			ETA_STRING=$(printf '%02d' ${ETA})
-			D4="e${ETA_STRING}"
+	# parse the simulation parameters from the line
+	D="$(echo ${SIMPARM} | cut -d , -f 7 )/" # path to the simulation directory
+	ANNEALID="$(echo ${SIMPARM} | cut -d , -f 2 )"
+	XA_VAL="$(echo ${SIMPARM} | cut -d , -f 3 )"
+	H_VAL="$(echo ${SIMPARM} | cut -d , -f 4 )"
+	ETA_VAL="$(echo ${SIMPARM} | cut -d , -f 5 )"
 
-			# establish directory path
-			D="${D0}/${D1}/${D2}/${D3}/${D4}/"
+	# establish annealing simulation id
+	SUBDAG="${ANNEALID}.spl"
 
-			# establish annealing simulation id
-			ANNEALID="${D2}${D3}${D4}"
-			SUBDAG="${ANNEALID}.spl"
+	# generate simulation directory and files
+	gensimdir
 
-			# generate simulation directory and files
-			gensimdir
+	# add annealing simulation instructions to the subdag
+	echo "SPLICE ${ANNEALID} ${SUBDAG} DIR ${D}" >> $DAG
 
-			# TODO :: establish analysis nodes
+	# increment the line number and repeat
+	((LINE+=1))
 
-			# add annealing simulation instructions to the subdag
-			echo "SPLICE ${ANNEALID} ${SUBDAG} DIR ${D}" >> $DAG
-
-			# increment density
-			((ETA+=ETA_INC))
-		done
-
-	# increment field string
-	((FIELD+=FIELD_INC))
-	done
-
-# increment chirality
-((ACHAI+=ACHAI_INC))
+	# TODO :: establish analysis nodes
 done
+
+exit 0
 
 # submit job to CHTC
 if [[ SUBMIT_BOOL -eq 1 ]]; then
