@@ -111,9 +111,9 @@ elif [[ BOOL_LOADLAST -eq 1 ]]; then
 	exit 0
 elif [[ BOOL_RERUN -eq 1 ]]; then
 	# if rerunning a previous iteration of the annealing simulation
-	# the script simply creates the directory in the temporary annealing
-	# directory, where all of the simulation files will be saved to
-	# once the rerun will be saved to for postscript processing
+	# the script simply creates the simulation save directory in the 
+	# temporary annealing directory, where all of the simulation files 
+	# will be saved to once the simulation completes for postscript processing
 	RERUN_DIR=$(printf '%03d' ${RERUN_IT})
 	mkdir -p "./anneal/tmp/${RERUN_DIR}/"
 fi
