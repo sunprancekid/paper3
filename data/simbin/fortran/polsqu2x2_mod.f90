@@ -874,7 +874,8 @@ subroutine set_thermostat (status, freq)
     endif
 end subroutine set_thermostat
 
-subroutine set_external_field (status, strength, freq, force, ori) 
+subroutine set_external_field (status, strength, rot_status, rot_freq, &
+    freq, force, ori) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if external field should be turned on or off
@@ -1062,6 +1063,16 @@ subroutine set_external_field (status, strength, freq, force, ori)
         write (*,*) "set_external_field :: external field is off."
     endif
 end subroutine set_external_field
+
+subroutine set_field_rotation (rot_status, rot_freq) 
+    implicit none
+    logical, intent(in), optional :: rot_status
+    ! boolean that determines if the external field is rotating
+    real, intent(in), optional :: rot_freq
+    ! positive real number that indicates the rate at which the external
+    ! field rotates (in rads / sec), if field rotation has been turned on
+
+end subroutine
 
 ! ** type(id) functions **************************************
 
@@ -4047,8 +4058,13 @@ subroutine field_ghost_collision(impulse)
 
     ! determine the direction of the field vector
     if (field_rotation) then 
+        ! the field is rotating
+        ! field points constantly in the direction of the y-axis
+        field_vec = get_field_vec(angvel = ..., time = timenow)
+        ! scale the vector by the magnitude of the interaction
+        field_vec%d = field_vec%d * impulse
         ! TODO :: implement field rotation
-        write (*,*) 'TODO :: IMPLEMENT FIELD ROTATION'
+        ! write (*,*) 'TODO :: IMPLEMENT FIELD ROTATION'
     else
         ! the field is not rotating
         ! field points constantly in the direction of the y-axis
