@@ -153,7 +153,7 @@ real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bon
 ! ** andersen thermostat *************************************
 ! assigned system temperature, used to initialize the velocity
 ! of simulation particles
-real(kind=dbl), parameter :: default_temperature = 3.0
+real(kind=dbl), parameter :: default_temperature = 0.3
 real(kind=dbl), parameter :: max_temperature = 10.
 real(kind=dbl), parameter :: min_temperature = 0.001
 logical :: use_default_temperature = .true.
@@ -874,8 +874,7 @@ subroutine set_thermostat (status, freq)
     endif
 end subroutine set_thermostat
 
-subroutine set_external_field (status, strength, rot_status, rot_freq, &
-    freq, force, ori) 
+subroutine set_external_field (status, strength, freq, force, ori) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if external field should be turned on or off
@@ -1078,7 +1077,7 @@ subroutine set_external_field_rotation (rot_status, rot_freq)
     2 format(" set_external_field_rotation :: unable to assign value for external field rotation frequency ", &
         "passed to the method, as the value (", f8.4,") is less than zero.")
     3 format (" set_external_field_rotation :: external field rotation frequency was set to ", f7.4, &
-        "radians per second.")
+        " radians per second.")
 
 
     ! check the status of the rotating external field
@@ -1124,7 +1123,6 @@ subroutine set_external_field_rotation (rot_status, rot_freq)
             external_field_angvel = default_field_angvel
         endif
     endif
-
 end subroutine set_external_field_rotation
 
 ! ** type(id) functions **************************************
@@ -3186,7 +3184,7 @@ logical function determine_percolation (n_clusters) ! #percy
                 a%one = i 
                 a%two = m
                 call clusteranal (n, percolation, a)
-                if (percolation(1) .and. percolation(2)) determine_percolation = .true.
+                if (percolation(1) .or. percolation(2)) determine_percolation = .true.
             endif
         enddo
     enddo
@@ -4121,6 +4119,7 @@ subroutine field_ghost_collision(impulse)
     else
         ! the field is not rotating
         ! field points constantly in the direction of the y-axis
+        ! TODO :: set default orientation and pass to the method
         field_vec = get_field_vec()
         ! scale the vector by the magnitude of the interaction
         field_vec%d = field_vec%d * impulse
@@ -4216,8 +4215,8 @@ type(vec) function get_field_vec (ori, angvel, time)
 
     ! if the angular velocity and time were passed to the method
     if (present(angvel) .and. present(time)) then 
-        get_field_vec%d(1) = cos((time / angvel) * twopi)
-        get_field_vec%d(2) = sin((time / angvel) * twopi)
+        get_field_vec%d(1) = cos((time * angvel))! * twopi)
+        get_field_vec%d(2) = sin((time * angvel))! * twopi)
     endif 
 end function get_field_vec
 
