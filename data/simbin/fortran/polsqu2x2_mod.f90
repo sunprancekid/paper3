@@ -1064,7 +1064,7 @@ subroutine set_external_field (status, strength, rot_status, rot_freq, &
     endif
 end subroutine set_external_field
 
-subroutine set_field_rotation (rot_status, rot_freq) 
+subroutine set_external_field_rotation (rot_status, rot_freq) 
     implicit none
     logical, intent(in), optional :: rot_status
     ! boolean that determines if the external field is rotating
@@ -1072,7 +1072,46 @@ subroutine set_field_rotation (rot_status, rot_freq)
     ! positive real number that indicates the rate at which the external
     ! field rotates (in rads / sec), if field rotation has been turned on
 
-end subroutine
+    ! formatting statements
+    1 format(" set_field_rotation :: ")
+
+
+    ! check the status of the rotating external field
+    if (present(rot_status)) then 
+        ! check if the external field is on
+        if (field) then
+            ! check if the rotation of the field was field is on
+            if (rot_status) then 
+                ! if the rotating external field was turned on
+                write (*,*) "set_external_field_rotation :: external field rotation was turned on."
+                field_rotation = .true.
+            else
+                ! if the rotating external field was turned off
+                write (*,*) "set_external_field_rotation :: external field rotation was turned off."
+                field_rotation = .false.
+            endif
+        else
+            ! if the external field is off, then field rotation cannot be turned on
+            write (*,*) "set_external_field_rotation :: external field is currently turned off."
+            field_rotation = .false.
+        endif
+    endif
+
+    ! if (field_rotation) then 
+    !     ! if the rotation of the external field was turned on
+    !     ! assign the frequency of external field rotation
+    !     if (present(rot_freq)) then 
+    !         ! check that the value passed to the method is within the acceptable bounds
+    !         ! the rotation frequency of the field cannot be less than zero
+
+    !     else
+    !         ! if value for the rotational frequency was not passed to the method,
+    !         ! then assigned the default
+
+    !     endif
+    ! endif
+
+end subroutine set_external_field_rotation
 
 ! ** type(id) functions **************************************
 
@@ -4060,7 +4099,7 @@ subroutine field_ghost_collision(impulse)
     if (field_rotation) then 
         ! the field is rotating
         ! field points constantly in the direction of the y-axis
-        field_vec = get_field_vec(angvel = ..., time = timenow)
+        field_vec = get_field_vec(angvel = external_field_angvel, time = timenow)
         ! scale the vector by the magnitude of the interaction
         field_vec%d = field_vec%d * impulse
         ! TODO :: implement field rotation
