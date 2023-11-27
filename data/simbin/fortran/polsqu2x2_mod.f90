@@ -1073,7 +1073,12 @@ subroutine set_external_field_rotation (rot_status, rot_freq)
     ! field rotates (in rads / sec), if field rotation has been turned on
 
     ! formatting statements
-    1 format(" set_field_rotation :: ")
+    1 format(" set_external_field_rotation :: external field rotational frequency was assigned the ", &
+        "default value of ", f7.4, " radians per second.")
+    2 format(" set_external_field_rotation :: unable to assign value for external field rotation frequency ", &
+        "passed to the method, as the value (", f8.4,") is less than zero.")
+    3 format (" set_external_field_rotation :: external field rotation frequency was set to ", f7.4, &
+        "radians per second.")
 
 
     ! check the status of the rotating external field
@@ -1097,19 +1102,28 @@ subroutine set_external_field_rotation (rot_status, rot_freq)
         endif
     endif
 
-    ! if (field_rotation) then 
-    !     ! if the rotation of the external field was turned on
-    !     ! assign the frequency of external field rotation
-    !     if (present(rot_freq)) then 
-    !         ! check that the value passed to the method is within the acceptable bounds
-    !         ! the rotation frequency of the field cannot be less than zero
-
-    !     else
-    !         ! if value for the rotational frequency was not passed to the method,
-    !         ! then assigned the default
-
-    !     endif
-    ! endif
+    if (field_rotation) then 
+        ! if the rotation of the external field was turned on
+        ! assign the frequency of external field rotation
+        if (present(rot_freq)) then 
+            ! check that the value passed to the method is within the acceptable bounds
+            ! the rotation frequency of the field cannot be less than zero
+            if (rot_freq <= 0.) then 
+                ! external field rotation cannot be less than zero
+                write (*, 2) rot_freq
+                write (*, 1) default_field_angvel
+                external_field_angvel = default_field_angvel
+            else
+                write (*,3) rot_freq
+                external_field_angvel = rot_freq
+            endif
+        else
+            ! if value for the rotational frequency was not passed to the method,
+            ! then assigned the default
+            write (*,1) default_field_angvel
+            external_field_angvel = default_field_angvel
+        endif
+    endif
 
 end subroutine set_external_field_rotation
 
