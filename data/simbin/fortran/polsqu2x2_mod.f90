@@ -2480,7 +2480,7 @@ subroutine close_files ()
         ',',anti%equilavg,',',anti%equilstd,& ! anti-parallel (AP) order parameter, used for double stranded OP
         ',',full%equilavg,',',full%equilstd,& ! double-stranded (DS) order parameter
         ',',percy%equilavg,',',percy%equilstd,& ! percolation order parameter
-        ',',n_clust%equilavg,',',n_clust%equilstd,& ! average cluster size order parameter
+        ',',nclust%equilavg,',',nclust%equilstd,& ! average cluster size order parameter
         ',',nematic%equilavg ,',',nematic%equilstd,& ! nematic order parameter
         ',',allign%equilavg,',',allign%equilstd ! magnetization order parameter
     close (unit = annealiounit, status = 'KEEP')
@@ -2698,7 +2698,7 @@ subroutine report_properties()
     write(opiounit, *) timenow,',',n_events,& ! current simulation time and number of events that have occured
         ',',poly%sum,',',poly%sum2,& ! polymerization OP
         ',',polys%sum,',',polys%sum2,& ! polymerization OP for same chirality squares
-        ',',polyo%sum,',',polyo%sum2,! polymerization OP for opposite chirality squares
+        ',',polyo%sum,',',polyo%sum2,&! polymerization OP for opposite chirality squares
         ',',ht%sum,',',ht%sum2,& ! head to tail OP
         ! ',',hts%sum,',',hts%sum2,& ! head to tail OP for same chiraltiy squares
         ! ',',hto%sum,',',hto%sum2,& ! head to tail OP for opposite chirality squares
@@ -3193,10 +3193,10 @@ subroutine determine_assembly (poly, poly_same, poly_oppo, ht, ap, ds)
                         !       iterations of this program
 
                     endif
-                endif
+                enddo
 
                 ! if the differnt partner test is still true
-                if (diffpart_test) then 
+                if (diffpartner_test) then 
 
                     ! the current ipartner has not matched with any
                     ! of the j partners, the different partner 
@@ -3205,6 +3205,15 @@ subroutine determine_assembly (poly, poly_same, poly_oppo, ht, ap, ds)
 
                     ! TODO :: add algorithm for differentiating between same and opposite
                     !         chirality DS assemblies
+                    ! if the two different partners of the first and second polarized spheres share the same chiraility
+                    ! if (square(ipartner(o)%one)%chai == square(jpartner(p)%one)%chai) then 
+                    !     ! if the chairality of those partners is the same as the cube n
+                    !     if (square(n)%chai == square(ipartner(o)%one)%chai) then 
+                    !         diffpartner_samechai = .true.
+                    !     else 
+                    !         diffpartner_oppochai = .true.
+                    !     endif
+                    ! endif
                 endif
 	        enddo
 	    endif

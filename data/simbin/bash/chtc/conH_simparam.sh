@@ -95,7 +95,8 @@ get_simpath () {
 	D4="r${D4}"
 
 	# generate the directory and return to user
-	local DIR=${D0}/${D1}/${D2}/${D3}/${D4}
+	# local DIR=${D0}/${D1}/${D2}/${D3}/${D4}
+	local DIR=${D0}/${D1}/${D2}/${D3}
 	echo $DIR
 }
 
