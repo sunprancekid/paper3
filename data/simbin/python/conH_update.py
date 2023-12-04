@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import glob
 import matplotlib.pyplot as plt
+import conH_simparam as parm
 
 ## PARAMETERS
 # execute script verbosely
@@ -191,6 +192,8 @@ anal_dir = sys.argv[1]
 
 ## SCRIPT
 ## create data frame which stores results for the simulation
+# parm.load_conH_parms(anal_dir)
+
 df_results = pd.DataFrame()
 i = 0 # used to count the number of rows in the data frame
 

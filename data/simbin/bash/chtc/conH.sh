@@ -35,6 +35,8 @@ declare -i GEN_H_VAL=0
 declare -i GEN_D_BOOL=0
 # integer value assoicated with controlling density iso-surface
 declare -i GEN_D_VAL=0
+# integer value assocaited with clearing the temporary directory
+declare -i CLEAR_DIR_BOOL=0
 
 ## simulation parameters
 # default job title, unless overwritten
@@ -552,7 +554,7 @@ genCHTCanneal_rerun () {
 	# directory that input files are loaded from
 	local REMAP_INPUT="anneal/${PREV_DIR}/"
 	# directory that the output files are saved to for postscript processing
-	local REMAP_OUTPUT="temp/${CURR_DIR}/"
+	local REMAP_OUTPUT="anneal/tmp/${CURR_DIR}/"
 	# list of files with path to the input directory
 	local INPT_SIM_ANN_SAVE="${REMAP_INPUT}${SIM_ANN_SAVE}"
 	local INPT_SIM_CHAI_SAVE="${REMAP_INPUT}${SIM_CHAI_SAVE}"
@@ -618,8 +620,8 @@ genCHTCanneal_rerun () {
 	# add node, pre- and post-script wrapper
 	echo "JOB ${ANNEALID}_anneal${CURR_DIR} ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "RETRY ${ANNEALID}_anneal${CURR_DIR} 2" >> $SUBDAG_PATH
-	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo "SCRIPT PRE ${ANNEALID}_anneal${CURR_DIR} prescript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_anneal${CURR_DIR} postscript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
 	echo " " >> $SUBDAG_PATH
 
 	# cat << EOF > filename
@@ -627,9 +629,20 @@ genCHTCanneal_rerun () {
 	# EOF
 }
 
+# method the clears the temporary directory
+clear_temp_dir (){
+
+	if [[ -d "${D}temp" ]]; then 
+		echo "Clearing temporary directory ${D}temp"
+		rm -r ${D}temp
+	else
+		echo "The temporary directory in ${D} does not exist."
+	fi
+}
+
 ## OPTIONS
 # parse options
-while getopts "hvosrj:c:e:f:gx:h:p:" option; do 
+while getopts "hvosrj:c:e:f:gx:h:p:t" option; do 
 	case $option in
 		v) # execute script verbosely
 			
@@ -678,6 +691,11 @@ while getopts "hvosrj:c:e:f:gx:h:p:" option; do
 			
 			# parse the value from the flag arguments
 			declare -i FRAC="${OPTARG}"
+			;;
+		t) # clear temporary directories
+
+			# boolean used to determine if the temporary directory should be cleared
+			declare -i CLEAR_DIR_BOOL=1
 			;;
 		h) # inform user of script flag options
 			help
@@ -755,6 +773,12 @@ do
 	# establish annealing simulation id
 	SUBDAG="${ANNEALID}.spl"
 
+	if [[ $CLEAR_DIR_BOOL -eq 1 ]]; then
+		clear_temp_dir
+		((LINE+=1))
+		continue
+	fi
+
 	# generate simulation directory and files
 	gensimdir
 
@@ -767,7 +791,7 @@ do
 	# TODO :: establish analysis nodes
 done
 
-exit 0
+# exit 0
 
 # submit job to CHTC
 if [[ SUBMIT_BOOL -eq 1 ]]; then

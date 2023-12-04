@@ -3437,7 +3437,14 @@ subroutine determine_nematic(nematic)
         ! calculate the angle of the particle relative to the x-axis
         phi(i) = 0.
         do q = 1, ndim 
-            dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            ! the orientation of the square depends on the squares chirality
+            if (square(i)%chai == 1) then
+                ! if the chirality of the square is A
+                dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            else
+                ! if the chirality of the square is B
+                dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+            endif
             if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
             if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
             phi(i) = phi(i) + (dr%r(q) ** 2)
@@ -3492,7 +3499,14 @@ subroutine calculate_allignment(op)
         ! calculate the angle of the colloid relative to the x-axis
         phi(i) = 0.
         do q = 1, ndim 
-            dr%r(q) = rcircles(1)%r(q) - rcircles(mer)%r(q) ! orientation of rod from first to last disc
+            ! the orientation of the square depends on the squares chirality
+            if (square(i)%chai == 1) then
+                ! if the chirality of the square is A
+                dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            else
+                ! if the chirality of the square is B
+                dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+            endif
             if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
             if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
             phi(i) = phi(i) + (dr%r(q) ** 2)
