@@ -8,8 +8,8 @@ set -e
 
 ## PARAMETERS 
 # login address to access hpc login nodes
-LOGIN="mad@ap21.uc.osg-htc.org"
-# LOGIN="matthew.dorsey@ap1.facility.path-cc.io"
+# LOGIN="mad@ap21.uc.osg-htc.org"
+LOGIN="matthew.dorsey@ap1.facility.path-cc.io"
 # LOGIN="mad@login05.osgconnect.net"
 # location of simulation directory
 LOC="~/paper3/data/"
@@ -113,7 +113,7 @@ elif [[ JOB_BOOL -eq 1 ]]; then
     # with the local simulations corresponding to the job id (JOB)
     rsync -Pavz "${LOGIN}:${LOC}${JOB}/" "./${JOB}/"
 
-    # echo "TODO upload simupdate program"         
+    # echo "TODO upload simupdate program"   
     # ./simbin/java/SimUpdate.sh ${JOB} true
 
 elif [[ SAVE_BOOL -eq 1 ]]; then 

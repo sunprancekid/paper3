@@ -40,7 +40,7 @@ declare -i GEN_D_VAL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
-SIM_MOD="squ2"
+SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
 declare -i CELL=32
 # starting temperature of annealing simulation
@@ -131,7 +131,7 @@ gensimdir () {
 
 	# check if directory already exists
 	declare -i GEN_DIR=0
-	if [[ -f "${D}/${SUBDAG}" ]]; then 
+	if [[ -d "${D}/anneal" ]]; then 
 		# if the subdag exists, then the directory has been initialized
 		# check if the directory should be over written
 		if [[ OVERWRITE_BOOL -eq 1 ]]; then 
@@ -182,13 +182,16 @@ gensimdir () {
 		declare -i N_ANNEAL=${#dirs[@]}
 		((N_ANNEAL=N_ANNEAL-2))
 
+		# echo "${N_ANNEAL} annealing simulations have already been performed."
+		# return
+
 		# determine the nodes to intialize based on the number of annealing
 		# simulations that have been performed
 		if [[ N_ANNEAL -le 0 ]];
 		then
 			# if no annealing simulations have been performed
 			# establish the initial annealing
-			echo "No annealing simulations have been performed"
+			echo "No annealing simulations have been performed."
 
 			# perform the same routine, as if initializing the simulation
 			# establish the initialization node
@@ -205,9 +208,15 @@ gensimdir () {
 			# rerun all of the previous annealing simulations
 			if [[ RERUN_BOOL -eq 1 ]]; then
 				echo "Rerunning previous annealing nodes."
-				for (( i=0; i<$N_ANNEAL; i++ ))
+				declare -i ANNEAL_IT=0
+				while (("$ANNEAL_IT" < "$N_ANNEAL"))
 				do
-					genCHTCanneal_rerun i
+					# if [[ ANNEAL_IT -eq 2 ]]; then 
+					# 	exit 0
+					# fi
+					genCHTCanneal_rerun $ANNEAL_IT
+					declare -i ANNEAL_IT=$((ANNEAL_IT+1))
+					# echo "$ANNEAL_IT is less than $N_ANNEAL"
 				done
 			fi
 
@@ -346,6 +355,7 @@ genCHTCinit() {
 	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo " " >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes
@@ -466,6 +476,7 @@ genCHTCanneal() {
 	fi
 	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo " " >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes that should be rerun
@@ -568,13 +579,13 @@ genCHTCanneal_rerun () {
 	## OPTIONS
 	# none
 
-	echo "The CURRENT DIRECTORY is (${CURR_DIR}) and the PREVIOUS DIRECTORY is (${PREV_DIR})."
-	return
+	# echo "The CURRENT DIRECTORY is (${CURR_DIR}) and the PREVIOUS DIRECTORY is (${PREV_DIR})."
+	# return
 
 	## SCRIPT
 	# if verbose, inform the user
 	if [[ VERB_BOOL -eq 1 ]]; then 
-		echo "Establishing looping anneal node for annealing simulation (${ANNEALID})."
+		echo "Establishing rerun node for iteration number ${CURR_DIR} of annealing simulation ${ANNEALID}."
 	fi
 
 	# write submission script
@@ -609,6 +620,11 @@ genCHTCanneal_rerun () {
 	echo "RETRY ${ANNEALID}_anneal${CURR_DIR} 2" >> $SUBDAG_PATH
 	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo " " >> $SUBDAG_PATH
+
+	# cat << EOF > filename
+	# I am $(whoami)
+	# EOF
 }
 
 ## OPTIONS
@@ -682,8 +698,9 @@ shift $((OPTIND-1))
 
 ## SCRIPT
 # establish initial directories, file names
-SIMID=${SIM_MOD}_c${CELL}
-D0=${JOB}/${SIMID}
+SIMID=${SIM_MOD}c${CELL}
+# D0=${JOB}/${SIMID}
+D0=${JOB}/${SIM_MOD}_c${CELL}
 JOBID=${JOB}_${SIMID}
 # name of file containing simulation parameters
 SIMPARAM_FILE=${D0}/${JOBID}.csv

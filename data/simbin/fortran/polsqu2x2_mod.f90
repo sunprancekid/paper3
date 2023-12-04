@@ -153,7 +153,7 @@ real(kind=dbl), parameter :: ocbond = sqrt(2 * sigma1) + delta ! outer cross bon
 ! ** andersen thermostat *************************************
 ! assigned system temperature, used to initialize the velocity
 ! of simulation particles
-real(kind=dbl), parameter :: default_temperature = 0.3
+real(kind=dbl), parameter :: default_temperature = 3.0
 real(kind=dbl), parameter :: max_temperature = 10.
 real(kind=dbl), parameter :: min_temperature = 0.001
 logical :: use_default_temperature = .true.
@@ -3451,12 +3451,13 @@ subroutine determine_nematic(nematic)
     ! calculate the difference in orientation between all cubic pairs 
     do i = 1, (cube - 1)
         do j = i + 1, cube 
-            nematic = nematic + (cos(phi(i) - phi(j)) ** 2)
+            nematic = nematic + (2. * cos(phi(i) - phi(j)))
+            ! nematic = nematic + (cos(phi(i) - phi(j)) ** 2)
             nem_count = nem_count + 1
         enddo
     enddo
     nematic = nematic / real(nem_count) 
-    nematic = (3. * nematic - 1.) / 2.
+    ! nematic = 2. * nematic - 1
 end subroutine determine_nematic
 
 ! // allignment order parameter //
