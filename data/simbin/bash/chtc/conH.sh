@@ -243,6 +243,11 @@ gensimdir () {
 	# copy pre / post - script wrappers for annealing simulations
 	cp ./simbin/bash/chtc/anneal_wrappers/* "${D}"
 	chmod u+x "${D}comp_temp.py" # add execution status to python script
+	# if the file containing wrapper stdout exists, clear it for the new job
+	if [[ -f "${D}${JOBID}${ANNEALID}_stdout.txt" ]]; then 
+		# delete the file
+		rm "${D}${JOBID}${ANNEALID}_stdout.txt"
+	fi
 
 	# write the executable to the simulation directory
 	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
@@ -462,7 +467,7 @@ genCHTCanneal() {
 	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	# echo "max_retries = 5" >> $SUB_PATH
 	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
@@ -610,7 +615,7 @@ genCHTCanneal_rerun () {
 	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
@@ -632,9 +637,10 @@ genCHTCanneal_rerun () {
 # method the clears the temporary directory
 clear_temp_dir (){
 
-	if [[ -d "${D}temp" ]]; then 
-		echo "Clearing temporary directory ${D}temp"
-		rm -r ${D}temp
+	if [[ -d "${D}anneal/tmp" ]]; then 
+		echo "Clearing temporary directory ${D}anneal/tmp"
+		rm -r ${D}anneal/tmp
+		mkdir ${D}anneal/tmp
 	else
 		echo "The temporary directory in ${D} does not exist."
 	fi

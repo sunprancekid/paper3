@@ -28,7 +28,8 @@ def load_conH_parms(parm_path):
 	for index, row in df_simparms.iterrows():
 		# load the parameters, initialize the conH_param object, append to the list
 		parm = conH_simparm(row['jobid'], 
-			row['annealid'],
+			# row['annealid'],
+			row['simid'],
 			row['path'],
 			row['XA'],
 			row['H'],

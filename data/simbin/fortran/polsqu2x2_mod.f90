@@ -3458,7 +3458,7 @@ subroutine determine_nematic(nematic)
     ! calculate the difference in orientation between all cubic pairs 
     do i = 1, (cube - 1)
         do j = i + 1, cube 
-            nematic = nematic + (2. * cos(phi(i) - phi(j)))
+            nematic = nematic + (cos(2. * (phi(i) - phi(j))))
             ! nematic = nematic + (cos(phi(i) - phi(j)) ** 2)
             nem_count = nem_count + 1
         enddo

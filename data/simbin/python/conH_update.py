@@ -83,35 +83,35 @@ def plot_temp_time_series (save_path, time, temp):
 
 # method used to compile results from the simulation, report the current
 # state of the simulation to the user
-def update_simulation_results(sim_dir):
+def update_simulation_results(sim_parm):
 
-	# parse the simid from the splice file
-	simid = glob.glob(sim_dir + "*.spl")
-	simid = simid[0].replace(sim_dir, '').replace(".spl", '')
+	# # parse the simid from the splice file
+	# simid = glob.glob(sim_dir + "*.spl")
+	# simid = simid[0].replace(sim_dir, '').replace(".spl", '')
 
-	# parse the job id from the initial simulations
-	jobid = glob.glob(sim_dir + "anneal/init/*" + simid + "__simSAVE.dat")
-	if len(jobid) == 0:
-		print("Unable to parse JOBID from DIR ({sim_dir}). Initial simulation directory does not exist.")
-		return None
-	jobid = jobid[0].replace(sim_dir + "anneal/init/", '').replace(simid + "__simSAVE.dat", '')
+	# # parse the job id from the initial simulations
+	# jobid = glob.glob(sim_parm.path + "/anneal/init/*" + simid + "__simSAVE.dat")
+	# if len(jobid) == 0:
+	# 	print("Unable to parse JOBID from DIR ({sim_dir}). Initial simulation directory does not exist.")
+	# 	return None
+	# jobid = jobid[0].replace(sim_dir + "anneal/init/", '').replace(simid + "__simSAVE.dat", '')
 
 	# create the analysis directory, if it does not exist already
-	if not os.path.exists(sim_dir + "anal/"):
-		os.mkdir(sim_dir + "anal/")
+	if not os.path.exists(sim_parm.path + "/anal/"):
+		os.mkdir(sim_parm.path + "/anal/")
 
 	# get the list of directories in the annealing directory that
 	# match the naming convention
-	anneal_dir_list = glob.glob(sim_dir + "anneal/[0-9][0-9][0-9]/")
+	anneal_dir_list = glob.glob(sim_parm.path + "/anneal/[0-9][0-9][0-9]/")
 	anneal_int_list = np.empty(len(anneal_dir_list), dtype=int)
 	for i in range(len(anneal_dir_list)):
 		anneal_int_list[i] = int(anneal_dir_list[i].\
-			replace(sim_dir + "anneal/", '').replace('/', ''))
+			replace(sim_parm.path + "/anneal/", '').replace('/', ''))
 	anneal_int_list = np.sort(anneal_int_list)
 
 	# parse the header for the anneal file from the first simulation
-	anneal_dir = "anneal/{:03d}/".format(anneal_int_list[0])
-	anneal_file = sim_dir + anneal_dir + jobid + simid + "_anneal.csv"
+	anneal_dir = "/anneal/{:03d}/".format(anneal_int_list[0])
+	anneal_file = sim_parm.path + anneal_dir + sim_parm.jobid + sim_parm.simid + "_anneal.csv"
 	if not os.path.exists(anneal_file):
 		print("Unable to open ANNEAL FILE ({anneal_file}). Cannot parse header.")
 		return None
@@ -129,8 +129,8 @@ def update_simulation_results(sim_dir):
 	for i in anneal_int_list:
 
 		# establish the annealing file
-		anneal_dir = "anneal/{:03d}/".format(anneal_int_list[i])
-		anneal_file = sim_dir + anneal_dir + jobid + simid + "_anneal.csv"
+		anneal_dir = "/anneal/{:03d}/".format(anneal_int_list[i])
+		anneal_file = sim_parm.path + anneal_dir + sim_parm.jobid + sim_parm.simid + "_anneal.csv"
 
 		# establish that the file exists
 		if not os.path.exists(anneal_file):
@@ -165,12 +165,12 @@ def update_simulation_results(sim_dir):
 
 	# write the annealing results from each simulation to the simulation
 	# summary file
-	sim_sum_file = sim_dir + "anal/" + jobid + simid + "_sum.csv"
+	sim_sum_file = sim_parm.path + "/anal/" + sim_parm.jobid + sim_parm.simid + "_sum.csv"
 	df.to_csv(sim_sum_file, index = False)
 
 	# plot the temperature profile of the simulation as a function of the 
 	# simulation time and simulation events
-	plot_temp_time_series(sim_dir + "anal/" + jobid + simid + "_temptime.png",\
+	plot_temp_time_series(sim_parm.path + "/anal/" + sim_parm.jobid + sim_parm.simid + "_temptime.png",\
 		df["time"].tolist(), df["temp"].tolist())
 
 	# parse the results for each order parameter / fluctuation, 
@@ -182,77 +182,87 @@ def update_simulation_results(sim_dir):
 
 	## TODO :: plot properties and fluctuations for all properties (make dict?)
 	## TODO :: return most recent point in data series for sim update file
-	return simid, jobid, prop_dict
+	return prop_dict
 
 
 ## ARGUMENTS
-# path to directory containing simulation files
-anal_dir = sys.argv[1]
+# id associated with job
+job = sys.argv[1]
+# id associated with simulation parameters
+sim = sys.argv[2]
+# optional path to csv file containing simulation parameters
+simparm_path = sys.argv[3]
 
 
 ## SCRIPT
 ## create data frame which stores results for the simulation
-# parm.load_conH_parms(anal_dir)
 
-df_results = pd.DataFrame()
+job_parms = parm.load_conH_parms(simparm_path) # load simulation parameters from file
+df_results = pd.DataFrame() # establish empty data frame that contains the results
 i = 0 # used to count the number of rows in the data frame
 
-##  determine the simulation parameters based on the directory hirearchy
-# variable that contains the current operating directory
-curr_dir = anal_dir
+# loop through parameters, load results
+for p in job_parms:
+	# inform user
+	if verbose:
+		print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
 
-# the first directory is the number fraction of achirality particles
-# determine the simulation parameters according to the directory hirerarchy
-achai_params = get_dir_params(curr_dir, "a")
+	# compile the current results of the simulation, return sim infor
+	prop_dict = update_simulation_results(p)
 
-# loop through each achirality directory, determine next set of parameters
-for achai_val in achai_params:
+	# create dictionary containing simulation parameters, add to dataframe
+	# sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
+	# 	'field': field_val, 'density': density_val}
+	sim_dict = p.info() | prop_dict
+	df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
 
-	# get the directory corresponding to the achiraliry parameter value
-	achai_dir = "a{:03d}/".format(int(achai_val * 100))
-	curr_dir = anal_dir + achai_dir
-
-	# the second directory in the hirearchy is the set point of 
-	# the external field strength
-	field_params = get_dir_params(curr_dir, "h")
-
-	# loop through each directory external field strength parameters
-	for field_val in field_params:
-
-		# get the directory corresponding to the external field parameter value
-		field_dir = "h{:02d}/".format(int(field_val * 100))
-		curr_dir = anal_dir + achai_dir + field_dir
-
-		# the third directory in the hirearchy is the simulation density
-		density_params = get_dir_params(curr_dir, "e")
-
-		# loop through each density directory
-		for density_val in density_params:
-
-			# get the directory corresponding to the simulation density
-			density_dir = "e{:02d}/".format(int(density_val * 100))
-			curr_dir = anal_dir + achai_dir + field_dir + density_dir
-			if verbose:
-				print("Summarizing directory no. {:d} ({:s})".format(i, curr_dir))
-
-			# compile the current results of the simulation, return sim infor
-			simid, jobid, prop_dict = update_simulation_results(curr_dir)
-
-			# create dictionary containing simulation parameters, add to dataframe
-			sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
-				'field': field_val, 'density': density_val}
-			sim_dict = sim_dict | prop_dict
-			df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
-
-			# increment the number of rows in the data frame
-			i += 1
+	# increment the number of rows in the data frame
+	i += 1
 
 # using the simulation directories, create phase diagrams for the following conditions
 
 
 # print the results as a csv
 # create summary directories file
-if not os.path.exists(anal_dir + "summary/"):
-	os.mkdir(anal_dir + "summary/")
+if not os.path.exists(f"{job}/{sim}/summary/"):
+	os.mkdir(f"{job}/{sim}/summary/")
 # write the sim status file to the summary directory
-df_results.to_csv(anal_dir+ "summary/status.csv", index = False)
+df_results.to_csv(f"{job}/{sim}/summary/status.csv", index = False)
+
+
+
+
+# ##  determine the simulation parameters based on the directory hirearchy
+# # variable that contains the current operating directory
+# curr_dir = anal_dir
+
+# # the first directory is the number fraction of achirality particles
+# # determine the simulation parameters according to the directory hirerarchy
+# achai_params = get_dir_params(curr_dir, "a")
+
+# # loop through each achirality directory, determine next set of parameters
+# for achai_val in achai_params:
+
+# 	# get the directory corresponding to the achiraliry parameter value
+# 	achai_dir = "a{:03d}/".format(int(achai_val * 100))
+# 	curr_dir = anal_dir + achai_dir
+
+# 	# the second directory in the hirearchy is the set point of 
+# 	# the external field strength
+# 	field_params = get_dir_params(curr_dir, "h")
+
+# 	# loop through each directory external field strength parameters
+# 	for field_val in field_params:
+
+# 		# get the directory corresponding to the external field parameter value
+# 		field_dir = "h{:02d}/".format(int(field_val * 100))
+# 		curr_dir = anal_dir + achai_dir + field_dir
+
+# 		# the third directory in the hirearchy is the simulation density
+# 		density_params = get_dir_params(curr_dir, "e")
+
+# 		# loop through each density directory
+# 		for density_val in density_params:
+
+# 			# get the directory corresponding to the simulation density
+# 			density_dir = "e{:02d}/".format(int(density_val * 100))

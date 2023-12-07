@@ -18,6 +18,9 @@ SAVE=( "fposSAVE" "velSAVE" "chaiSAVE" "annealSAVE" "simSAVE" )
 # temp file used to store information about saving and loading
 # annealing simulations between pre- and post-processing scripts
 TMP_FILE="./anneal/tmp/next_dir.txt"
+# retry file contains the number of times that a job exits with 
+# non-zero exit code in a row
+RETRY_FILE="./anneal/tmp/retry.txt"
 # boolean determining if initial simulation save data should be loaded
 declare -i BOOL_LOADINIT=0
 # boolean determining if last save should be loaded
@@ -30,7 +33,54 @@ declare -i BOOL_RERUN=0
 
 
 ## FUNCTIONS
-# none
+# check number of annealing retries, decriments next directory integer if the
+# number of failed attempts in a row is greater than the allowable amount
+check_retries() {
+
+	## PARAMETERS
+	# maximum number of times an annealing node can fail in a row
+	declare -i MAX_RETRIES=10
+
+	## OPTIONS
+	# none
+
+	## ARGUMENTS
+	# none
+
+	## SCRIPT
+	# get the number of retries from the retry file
+	declare -i RETRY_INT=$( head -n 1 $RETRY_FILE | tail -n 1 )
+
+	# determine if the number of retries is greater than the allowable amount
+	if [[ $RETRY_INT -ge $MAX_RETRIES ]]; then 
+		# inform the user
+		echo "${CURRENTTIME}: the annealing job has failed ${RETRY_INT} times, which exceeds the maximum of ${MAX_RETRIES}."
+
+		# if the number of failed attempts is too great, decriment
+		# the integer stored in the next directory file
+		NEXT_DIR_INT=$( head -n 1 $TMP_FILE | tail -n 1 )
+		# if the directory to load from is not the initial directory
+		if [[ "${NEXT_DIR_INT}" != "init" ]]; then
+			# then the value stored in the file is an integer
+			declare -i NEXT_DIR_INT=$NEXT_DIR_INT
+			if [[ $NEXT_DIR_INT -eq 0 ]]; then 
+				# if the current directory to load from is the zero-th
+				# annealing iteration, then the previous directory to load from
+				# is the initial directory
+				NEXT_DIR_INT="init"
+			else
+				# otherwise decriment the integer
+				((NEXT_DIR_INT-=1))
+			if
+		fi
+
+		# store the next integer in the next directory file
+		echo "${NEXT_DIR_INT}" > $TMP_FILE
+
+		# restart the number of retries count 
+		echo "0" > $RETRY_FILE
+	fi
+}
 
 
 ## OPTIONS
@@ -73,6 +123,7 @@ SIMID=$2
 
 
 ## SCRIPT
+
 # determine the operation that should be performed
 if [[ BOOL_LOADINIT -eq 1 ]]; then
 	# if the loading the initial simulation
@@ -87,16 +138,19 @@ if [[ BOOL_LOADINIT -eq 1 ]]; then
 
 	exit 0
 elif [[ BOOL_LOADLAST -eq 1 ]]; then
+	# check the number of retries
+	check_retries
+
 	# if loading the previous state of an annealing simulation
 	# get the directory that contains the previous state from the temporary file
 	NXT_DIR_INT=$( head -n 1 $TMP_FILE | tail -n 1 )
+	echo "${CURRENTTIME}: loading save files from annealing directory ${NXT_DIR_INT}." 
+
 	if [[ "${NXT_DIR_INT}" == "init" ]]; then 
 		# if the directory to load is the initial
 		NXT_DIR=$NXT_DIR_INT
 	else 
-		# otherwise the directory is stored as an integer
-		declare -i NXT_DIR_INT=$NXT_DIR_INT
-		# format the next directory
+		# format the next directory to a standard integer
 		NXT_DIR=$(printf '%03d' ${NXT_DIR_INT})
 	fi
 
@@ -116,5 +170,7 @@ elif [[ BOOL_RERUN -eq 1 ]]; then
 	# will be saved to once the simulation completes for postscript processing
 	RERUN_DIR=$(printf '%03d' ${RERUN_IT})
 	mkdir -p "./anneal/tmp/${RERUN_DIR}/"
+	# inform the user
+	echo "${CURRENTTIME}: Initializing rerun directory for annealing node ${RERUN_DIR}."
 fi
 
