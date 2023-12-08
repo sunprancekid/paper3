@@ -35,12 +35,14 @@ declare -i GEN_H_VAL=0
 declare -i GEN_D_BOOL=0
 # integer value assoicated with controlling density iso-surface
 declare -i GEN_D_VAL=0
+# integer value assocaited with clearing the temporary directory
+declare -i CLEAR_DIR_BOOL=0
 
 ## simulation parameters
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
-SIM_MOD="squ2"
+SIM_MOD="polsqu2x2"
 # default simulation cell size, unless overwritten
 declare -i CELL=32
 # starting temperature of annealing simulation
@@ -131,7 +133,7 @@ gensimdir () {
 
 	# check if directory already exists
 	declare -i GEN_DIR=0
-	if [[ -f "${D}/${SUBDAG}" ]]; then 
+	if [[ -d "${D}/anneal" ]]; then 
 		# if the subdag exists, then the directory has been initialized
 		# check if the directory should be over written
 		if [[ OVERWRITE_BOOL -eq 1 ]]; then 
@@ -182,13 +184,16 @@ gensimdir () {
 		declare -i N_ANNEAL=${#dirs[@]}
 		((N_ANNEAL=N_ANNEAL-2))
 
+		# echo "${N_ANNEAL} annealing simulations have already been performed."
+		# return
+
 		# determine the nodes to intialize based on the number of annealing
 		# simulations that have been performed
 		if [[ N_ANNEAL -le 0 ]];
 		then
 			# if no annealing simulations have been performed
 			# establish the initial annealing
-			echo "No annealing simulations have been performed"
+			echo "No annealing simulations have been performed."
 
 			# perform the same routine, as if initializing the simulation
 			# establish the initialization node
@@ -205,9 +210,15 @@ gensimdir () {
 			# rerun all of the previous annealing simulations
 			if [[ RERUN_BOOL -eq 1 ]]; then
 				echo "Rerunning previous annealing nodes."
-				for (( i=0; i<$N_ANNEAL; i++ ))
+				declare -i ANNEAL_IT=0
+				while (("$ANNEAL_IT" < "$N_ANNEAL"))
 				do
-					genCHTCanneal_rerun i
+					# if [[ ANNEAL_IT -eq 2 ]]; then 
+					# 	exit 0
+					# fi
+					genCHTCanneal_rerun $ANNEAL_IT
+					declare -i ANNEAL_IT=$((ANNEAL_IT+1))
+					# echo "$ANNEAL_IT is less than $N_ANNEAL"
 				done
 			fi
 
@@ -232,6 +243,11 @@ gensimdir () {
 	# copy pre / post - script wrappers for annealing simulations
 	cp ./simbin/bash/chtc/anneal_wrappers/* "${D}"
 	chmod u+x "${D}comp_temp.py" # add execution status to python script
+	# if the file containing wrapper stdout exists, clear it for the new job
+	if [[ -f "${D}${JOBID}${ANNEALID}_stdout.txt" ]]; then 
+		# delete the file
+		rm "${D}${JOBID}${ANNEALID}_stdout.txt"
+	fi
 
 	# write the executable to the simulation directory
 	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
@@ -346,6 +362,7 @@ genCHTCinit() {
 	echo "JOB ${ANNEALID}_init ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "SCRIPT PRE ${ANNEALID}_init prescript-wrapper.sh -i ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_init postscript-wrapper.sh -i ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo " " >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes
@@ -450,7 +467,7 @@ genCHTCanneal() {
 	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	# echo "max_retries = 5" >> $SUB_PATH
 	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
@@ -466,6 +483,7 @@ genCHTCanneal() {
 	fi
 	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -a ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
 	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -a ${FINAL_ANNEAL_TEMP} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo " " >> $SUBDAG_PATH
 }
 
 # script for generating annealing nodes that should be rerun
@@ -541,7 +559,7 @@ genCHTCanneal_rerun () {
 	# directory that input files are loaded from
 	local REMAP_INPUT="anneal/${PREV_DIR}/"
 	# directory that the output files are saved to for postscript processing
-	local REMAP_OUTPUT="temp/${CURR_DIR}/"
+	local REMAP_OUTPUT="anneal/tmp/${CURR_DIR}/"
 	# list of files with path to the input directory
 	local INPT_SIM_ANN_SAVE="${REMAP_INPUT}${SIM_ANN_SAVE}"
 	local INPT_SIM_CHAI_SAVE="${REMAP_INPUT}${SIM_CHAI_SAVE}"
@@ -568,13 +586,13 @@ genCHTCanneal_rerun () {
 	## OPTIONS
 	# none
 
-	echo "The CURRENT DIRECTORY is (${CURR_DIR}) and the PREVIOUS DIRECTORY is (${PREV_DIR})."
-	return
+	# echo "The CURRENT DIRECTORY is (${CURR_DIR}) and the PREVIOUS DIRECTORY is (${PREV_DIR})."
+	# return
 
 	## SCRIPT
 	# if verbose, inform the user
 	if [[ VERB_BOOL -eq 1 ]]; then 
-		echo "Establishing looping anneal node for annealing simulation (${ANNEALID})."
+		echo "Establishing rerun node for iteration number ${CURR_DIR} of annealing simulation ${ANNEALID}."
 	fi
 
 	# write submission script
@@ -597,7 +615,7 @@ genCHTCanneal_rerun () {
 	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
 	echo "request_memory = ${REQUEST_MEMORY}" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
+	# echo "on_exit_hold = (ExitCode != 0)" >> $SUB_PATH
 	# echo "requirements = HasSingularity" >> $SUB_PATH
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $SUB_PATH
 	echo "+ProjectName=\"NCSU_Hall\"" >> $SUB_PATH
@@ -607,13 +625,30 @@ genCHTCanneal_rerun () {
 	# add node, pre- and post-script wrapper
 	echo "JOB ${ANNEALID}_anneal${CURR_DIR} ${SUB_NAME}" >> $SUBDAG_PATH
 	echo "RETRY ${ANNEALID}_anneal${CURR_DIR} 2" >> $SUBDAG_PATH
-	echo "SCRIPT PRE ${ANNEALID}_anneal prescript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
-	echo "SCRIPT POST ${ANNEALID}_anneal postscript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo "SCRIPT PRE ${ANNEALID}_anneal${CURR_DIR} prescript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID}" >> $SUBDAG_PATH
+	echo "SCRIPT POST ${ANNEALID}_anneal${CURR_DIR} postscript-wrapper.sh -r ${RERUN_IT} ${JOBID} ${ANNEALID} \$RETURN \$RETRY" >> $SUBDAG_PATH
+	echo " " >> $SUBDAG_PATH
+
+	# cat << EOF > filename
+	# I am $(whoami)
+	# EOF
+}
+
+# method the clears the temporary directory
+clear_temp_dir (){
+
+	if [[ -d "${D}anneal/tmp" ]]; then 
+		echo "Clearing temporary directory ${D}anneal/tmp"
+		rm -r ${D}anneal/tmp
+		mkdir ${D}anneal/tmp
+	else
+		echo "The temporary directory in ${D} does not exist."
+	fi
 }
 
 ## OPTIONS
 # parse options
-while getopts "hvosrj:c:e:f:gx:h:p:" option; do 
+while getopts "hvosrj:c:e:f:gx:h:p:t" option; do 
 	case $option in
 		v) # execute script verbosely
 			
@@ -663,6 +698,11 @@ while getopts "hvosrj:c:e:f:gx:h:p:" option; do
 			# parse the value from the flag arguments
 			declare -i FRAC="${OPTARG}"
 			;;
+		t) # clear temporary directories
+
+			# boolean used to determine if the temporary directory should be cleared
+			declare -i CLEAR_DIR_BOOL=1
+			;;
 		h) # inform user of script flag options
 			help
 			;;
@@ -682,8 +722,9 @@ shift $((OPTIND-1))
 
 ## SCRIPT
 # establish initial directories, file names
-SIMID=${SIM_MOD}_c${CELL}
+SIMID=${SIM_MOD}c${CELL}
 D0=${JOB}/${SIMID}
+# D0=${JOB}/${SIM_MOD}_c${CELL}
 JOBID=${JOB}_${SIMID}
 # name of file containing simulation parameters
 SIMPARAM_FILE=${D0}/${JOBID}.csv
@@ -738,6 +779,12 @@ do
 	# establish annealing simulation id
 	SUBDAG="${ANNEALID}.spl"
 
+	if [[ $CLEAR_DIR_BOOL -eq 1 ]]; then
+		clear_temp_dir
+		((LINE+=1))
+		continue
+	fi
+
 	# generate simulation directory and files
 	gensimdir
 
@@ -750,7 +797,7 @@ do
 	# TODO :: establish analysis nodes
 done
 
-exit 0
+# exit 0
 
 # submit job to CHTC
 if [[ SUBMIT_BOOL -eq 1 ]]; then

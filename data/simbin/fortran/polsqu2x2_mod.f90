@@ -340,21 +340,20 @@ type(property) :: temp ! temperature
 type(property) :: pv ! accumulation
 type(property) :: z ! compressibility factor
 type(property), dimension(ndim) :: lm ! linear momentum in each dimension
-type(property) :: poly1 ! polyermization with one molecule order parameter
-type(property) :: poly1aa ! polymerization of a-chirality squares with different a-chirality squares
-type(property) :: poly1abba ! polymerization of squares with oppsosite chirality squares
-type(property) :: poly1bb ! polymerization of b-chirality squares with different b-chirality squares
-type(property) :: h2ts ! head to tail - same order parameter 
-type(property) :: h2to ! head to tail - opposite order parameter
+type(property) :: poly ! polyermization with one molecule order parameter
+type(property) :: polys ! polymerization of same chirality groups
+type(property) :: polyo ! polymerization of opposite chirality groups
+type(property) :: ht ! head to tail OP, also the single-stranded OP
+! type(property) :: hts ! head to tail OP for same chirality squares 
+! type(property) :: hto ! head to tail OP for opposite chirality squares
 type(property) :: anti ! anti-parallel order parameter
-type(property) :: poly2 ! polymerization with two molecules order parameter
-type(property) :: full ! fully-assembled order parameter
-type(property) :: fulls ! fully assembled order parameter for same chiralities 
-type(property) :: fullo ! fully assembled order parameter for same and opposite chiralities
+type(property) :: full ! double-stranded assembly order parameter
+! type(property) :: fulls ! double-stranded assembly order parameter for same chiralities 
+! type(property) :: fullo ! double-stranded assembly order parameter for same and opposite chiralities
 type(property) :: percy ! percolation order parameter
 type(property) :: nclust ! number of clusters identified by percolation algorithm 
 type(property) :: nematic ! nematic order parameter between all squares
-type(property) :: allign
+type(property) :: allign ! alignment with external field, magnetization order parameter
 ! ** efficiency methods **************************************
 real(kind=dbl) :: dispTotal ! displacement of fastest particle between neighborlist updates
 logical :: nbrnow ! update neighbor list?
@@ -1062,6 +1061,68 @@ subroutine set_external_field (status, strength, freq, force, ori)
         write (*,*) "set_external_field :: external field is off."
     endif
 end subroutine set_external_field
+
+subroutine set_external_field_rotation (rot_status, rot_freq) 
+    implicit none
+    logical, intent(in), optional :: rot_status
+    ! boolean that determines if the external field is rotating
+    real, intent(in), optional :: rot_freq
+    ! positive real number that indicates the rate at which the external
+    ! field rotates (in rads / sec), if field rotation has been turned on
+
+    ! formatting statements
+    1 format(" set_external_field_rotation :: external field rotational frequency was assigned the ", &
+        "default value of ", f7.4, " radians per second.")
+    2 format(" set_external_field_rotation :: unable to assign value for external field rotation frequency ", &
+        "passed to the method, as the value (", f8.4,") is less than zero.")
+    3 format (" set_external_field_rotation :: external field rotation frequency was set to ", f7.4, &
+        " radians per second.")
+
+
+    ! check the status of the rotating external field
+    if (present(rot_status)) then 
+        ! check if the external field is on
+        if (field) then
+            ! check if the rotation of the field was field is on
+            if (rot_status) then 
+                ! if the rotating external field was turned on
+                write (*,*) "set_external_field_rotation :: external field rotation was turned on."
+                field_rotation = .true.
+            else
+                ! if the rotating external field was turned off
+                write (*,*) "set_external_field_rotation :: external field rotation was turned off."
+                field_rotation = .false.
+            endif
+        else
+            ! if the external field is off, then field rotation cannot be turned on
+            write (*,*) "set_external_field_rotation :: external field is currently turned off."
+            field_rotation = .false.
+        endif
+    endif
+
+    if (field_rotation) then 
+        ! if the rotation of the external field was turned on
+        ! assign the frequency of external field rotation
+        if (present(rot_freq)) then 
+            ! check that the value passed to the method is within the acceptable bounds
+            ! the rotation frequency of the field cannot be less than zero
+            if (rot_freq <= 0.) then 
+                ! external field rotation cannot be less than zero
+                write (*, 2) rot_freq
+                write (*, 1) default_field_angvel
+                external_field_angvel = default_field_angvel
+            else
+                write (*,3) rot_freq
+                external_field_angvel = rot_freq
+            endif
+        else
+            ! if value for the rotational frequency was not passed to the method,
+            ! then assigned the default
+            write (*,1) default_field_angvel
+            external_field_angvel = default_field_angvel
+        endif
+    endif
+end subroutine set_external_field_rotation
 
 ! ** type(id) functions **************************************
 
@@ -2259,10 +2320,22 @@ subroutine open_files ()
     coorsqufile = trim(jobid) // trim(simid) // '_' // 'squmov.xyz' ! xyz file containing atomic coordinates for ovito animation
     if (moviesqu == 1) open (unit = coorsquiounit, file = trim(coorsqufile), status = 'REPLACE')
 
+    ! TODO :: only write the headers for the equiblibrium values if the OP boolean is represented
     annealfile = trim(jobid) // trim(simid) // '_anneal.csv' ! comma seperated list containing a summary of annealing simulations
     open (unit = annealiounit, file = trim(annealfile), status = 'REPLACE', iostat = ioerror)
-    write(annealiounit,*) 'id,time,set,temp,te,te_fluc,pot,pot_fluc,ke,ke_fluc,poly2,poly2_fluc,',&
-        'anti,anti_fluc,full,full_fluc,percy,percy_fluc,nematic,nem_fluc,allign,allign_fluc'
+    write(annealiounit,*) 'id,time',&! annealing number and current simulation time
+        ',set,temp',& ! temperature set point and measured value
+        ',te,te_fluc',& ! total energy
+        ',pot,pot_fluc',& ! potential energy
+        ',ke,ke_fluc',& ! kinetic energy
+        ',poly,poly_fluc',& ! polymerization
+        ',ht,ht_fluc',& ! head-to-tail, single stranded order parameters
+        ',anti,anti_fluc',& ! anti-parallel configuration order parameter
+        ',ds,ds_fluc',& ! double-stranded order parameter
+        ',percy,percy_fluc',& ! percolation order parameter
+        ',nclust,nclust_fluc',& ! average number of unique clusters
+        ',nematic,nem_fluc',& ! nematic order parameter
+        ',mag,mag_fluc' ! magnetization order parameter
 
     reportfile = trim(jobid) // trim (simid) // '.csv' ! comma seperated list containing time progression of properties 
     open (unit = reportiounit, file = reportfile, status = 'REPLACE')
@@ -2274,11 +2347,21 @@ subroutine open_files ()
 
     opfile = trim(jobid) // trim(simid) // '_op.csv' ! comma seperated list containing time progression of order parameters
     open(unit = opiounit, file = trim(opfile), status = 'REPLACE')
-    write(opiounit, *) 'time, events, h2ts, h2ts_fluc, h2to, h2to_fluc, anti, anti_fluc,', &
-        ' poly2, poly2_fluc, full, full_fluc, fulls, fulls_fluc, ,fullo, ', &
-        'fullo_fluc, poly1aa, poly1aa_fluc, poly1abba, poly1abba_fluc,',&
-        ' poly1bb, poly1bb_fluc, poly1, poly1_fluc, percolation, nclust,',&
-        ' nclust_fluc, nematic, nematic_fluc, allign, allign_fluc'
+    write(opiounit, *) 'time,events,',& ! simulation time and events that have occured
+        'poly,poly_fluc,',& ! polymerization OP
+        'polys,polys_fluc,',& ! polymerization OP for same chirality squares
+        'polyo,polyo_fluc,',& ! polymerization OP for opposite chirality squares
+        'ht,ht_fluc,',& ! head to tail OP
+        ! 'hts,hts_fluc,',& ! head to tail for squares with the same chirality
+        ! 'hto,hto_fluc,',& ! head to tail for squares with opposite chirality
+        'anti,anti_fluc,',& ! anti-parallel arrangement
+        'full,full_fluc,',& ! double stranded assembly OP 
+        ! 'fulls,fulls_fluc,',& ! double stranded assembly OP for squares with the same chirality
+        ! 'fullo,fullo_fluc,',& ! double stranded assembly OP for squares with the opposite chirality
+        'percolation,',& ! percolation OP
+        'nclust,nclust_fluc,',& ! average number of unique clusters of squares
+        'nematic,nematic_fluc,',& ! nematic OP
+        'allign,allign_fluc' ! magnetization OP
 
     mmfile = trim(jobid) // trim(simid) // '_mm.csv'
     open (unit = mmiounit, file = trim(mmfile), status = 'REPLACE')
@@ -2302,17 +2385,16 @@ subroutine close_files ()
 	end do
     call accumulate_properties (z, 3)
     ! order parameters 
-    call accumulate_properties (poly1, 5)
-    call accumulate_properties (poly1aa, 5)
-    call accumulate_properties (poly1abba, 5)
-    call accumulate_properties (poly1bb, 5)
-    call accumulate_properties (h2ts, 5)
-    call accumulate_properties (h2to, 5)
+    call accumulate_properties (poly, 5)
+    call accumulate_properties (polys, 5)
+    call accumulate_properties (polyo, 5)
+    call accumulate_properties (ht, 5)
+    ! call accumulate_properties (hts, 5)
+    ! call accumulate_properties (hto, 5)
     call accumulate_properties (anti, 5)
-    call accumulate_properties (poly2, 5)
     call accumulate_properties (full, 5)
-    call accumulate_properties (fulls, 5)
-    call accumulate_properties (fullo, 5)
+    ! call accumulate_properties (fulls, 5)
+    ! call accumulate_properties (fullo, 5)
     call accumulate_properties (percy, 5)
     call accumulate_properties (nclust, 5)
     call accumulate_properties (nematic, 5)
@@ -2386,11 +2468,21 @@ subroutine close_files ()
     write(reportiounit, *) ' red pote per cube  , ', (pot%equilavg / epsilon1)
     close (unit = reportiounit, status = 'KEEP')
     close (unit = opiounit, status = 'KEEP')
-    write(annealiounit, *) anneal,',',timenow,',',tempset,',',temp%equilavg,',',te%equilavg, & 
-        ',',te%equilstd,',',pot%equilavg,',',pot%equilstd,',',ke%equilavg,',',ke%equilstd, &
-        ',',poly2%equilavg,',',poly2%equilstd,',',anti%equilavg,',',anti%equilstd,',',&
-        full%equilavg,',',full%equilstd,',',percy%equilavg,',',percy%equilstd,&
-        ',',nematic%equilavg ,',',nematic%equilstd,',',allign%equilavg,',',allign%equilstd
+
+    ! TODO :: only write the equilibrium values if the order parameter boolean is represented
+    write(annealiounit, *) anneal,',',timenow,& ! annealing number and current simulation time
+        ',',tempset,',',temp%equilavg,& ! assigned temperature and measured temperature
+        ',',te%equilavg,',',te%equilstd,& ! total energy
+        ',',pot%equilavg,',',pot%equilstd,& ! potential energy
+        ',',ke%equilavg,',',ke%equilstd,& ! kinetic energy
+        ',',poly%equilavg,',',poly%equilstd,& ! polymerization order parameters
+        ',',ht%equilavg,',',ht%equilstd,& ! head to tail, single-stranded (SS) order parameters
+        ',',anti%equilavg,',',anti%equilstd,& ! anti-parallel (AP) order parameter, used for double stranded OP
+        ',',full%equilavg,',',full%equilstd,& ! double-stranded (DS) order parameter
+        ',',percy%equilavg,',',percy%equilstd,& ! percolation order parameter
+        ',',nclust%equilavg,',',nclust%equilstd,& ! average cluster size order parameter
+        ',',nematic%equilavg ,',',nematic%equilstd,& ! nematic order parameter
+        ',',allign%equilavg,',',allign%equilstd ! magnetization order parameter
     close (unit = annealiounit, status = 'KEEP')
 
     write(mmiounit, *) boundary_index, ',', upper_nematic_boundary, ',', lower_nematic_boundary, ',', &
@@ -2578,18 +2670,16 @@ subroutine report_properties()
     call accumulate_properties (pot, 3) ! calculate the average potential energy
     call accumulate_properties (ke, 3) ! calculate the average kinetic energy 
     call accumulate_properties (temp, 3) ! calculate the average temperature 
-    call accumulate_properties (h2ts, 3) ! calculate the average head-to-tail-same order parameter value 
-    call accumulate_properties (poly1, 3)
-    call accumulate_properties (poly1aa, 3) ! calculate the average aa polymerization
-    call accumulate_properties (poly1abba, 3) ! calculate the average ab-ba polymerization
-    call accumulate_properties (poly1bb, 3) ! calculate the average bb polymerization
-    call accumulate_properties (h2ts, 3) ! calculate the average head-to-tail-same order parameter value
-    call accumulate_properties (h2to, 3) ! calculate the average head-to-tail-opposite order parameter value
+    call accumulate_properties (poly, 3)
+    call accumulate_properties (polys, 3) ! calculate the average aa polymerization
+    call accumulate_properties (polyo, 3) ! calculate the average ab-ba polymerization
+    call accumulate_properties (ht, 3) ! calculate the average head to tail order parameter
+    ! call accumulate_properties (hts, 3) ! calculate the average head-to-tail-same order parameter value
+    ! call accumulate_properties (hto, 3) ! calculate the average head-to-tail-opposite order parameter value
     call accumulate_properties (anti, 3) ! calculate the average antiparallel order parameter value 
-    call accumulate_properties (poly2, 3) ! calculate the average polymerization order parameter value 
     call accumulate_properties (full, 3) ! calculate the average fully-assembled order parameter value
-    call accumulate_properties (fulls, 3) ! calculate the average fully-assembled-same order parameter value
-    call accumulate_properties (fullo, 3) ! calculate the average fully-assembled-oppo order parameter value
+    ! call accumulate_properties (fulls, 3) ! calculate the average fully-assembled-same order parameter value
+    ! call accumulate_properties (fullo, 3) ! calculate the average fully-assembled-oppo order parameter value
     call accumulate_properties (percy, 3) ! calculate the average percolation order parameter value
     call accumulate_properties (nclust, 3) ! calculate the average number of clusters
     call accumulate_properties (nematic, 3) ! calculate the average nematic order parameter 
@@ -2603,12 +2693,23 @@ subroutine report_properties()
         ke%sum2, ',', pot%sum, ',', pot%sum2, ',', temp%sum, ',', temp%sum2, ',', (lm(1)%sum+lm(2)%sum), &
         ',', z%value, ',', n_col, ',', n_ghost, ',', n_thermostat, ',',n_field,',',(n_col / timenow), ',', &
         n_bond, ',', n_hard, ',', n_well
-    write(opiounit, *) timenow, ',', n_events, ',', h2ts%sum, ',', h2ts%sum2, ',', h2to%sum, ',', h2to%sum2, &
-        ',', anti%sum,',', ',', anti%sum2, ',', poly2%sum, ',', poly2%sum2, ',', full%sum, ',', full%sum2, &
-        ',', fulls%sum, ',', fulls%sum2, ',', fullo%sum, ',', fullo%sum2, ',', poly1aa%sum, ',', poly1aa%sum2, &
-        ',', poly1abba%sum, ',', poly1abba%sum2, ',', poly1bb%sum, ',', poly1bb%sum2, ',', &
-        poly1%sum,',', poly1%sum2, ',', percy%sum, ',', nclust%sum, ',', nclust%sum2, ',', nematic%sum, &
-        ',', nematic%sum2, ',', allign%sum, ',', allign%sum2
+
+    ! write to the order parameter file
+    write(opiounit, *) timenow,',',n_events,& ! current simulation time and number of events that have occured
+        ',',poly%sum,',',poly%sum2,& ! polymerization OP
+        ',',polys%sum,',',polys%sum2,& ! polymerization OP for same chirality squares
+        ',',polyo%sum,',',polyo%sum2,&! polymerization OP for opposite chirality squares
+        ',',ht%sum,',',ht%sum2,& ! head to tail OP
+        ! ',',hts%sum,',',hts%sum2,& ! head to tail OP for same chiraltiy squares
+        ! ',',hto%sum,',',hto%sum2,& ! head to tail OP for opposite chirality squares
+        ',',anti%sum,',',anti%sum2,& ! anti parallel OP
+        ',',full%sum,',',full%sum2,& ! double stranded OP
+        ! ',',fulls%sum,',',fulls%sum2,& ! double stranded OP for same chirality squares
+        ! ',',fullo%sum,',',fullo%sum2,& ! double stranded OP for opposite chirality squares
+        ',',percy%sum,& ! percolation OP
+        ',',nclust%sum,',',nclust%sum2,& ! number of unique clusters of squares
+        ',',nematic%sum,',',nematic%sum2,& ! nematic OP
+        ',',allign%sum,',',allign%sum2 ! magnetization OP 
 
     ! if the system has equilibraited, accumulate equilibrium sums
 	if (n_events > event_equilibriate) then 
@@ -2619,17 +2720,16 @@ subroutine report_properties()
         call accumulate_properties (pot, 4)
         call accumulate_properties (ke, 4)
         call accumulate_properties (temp, 4)
-        call accumulate_properties (poly1, 4)
-        call accumulate_properties (poly1aa, 4)
-        call accumulate_properties (poly1abba, 4) 
-        call accumulate_properties (poly1bb, 4)
-        call accumulate_properties (h2ts, 4)
-        call accumulate_properties (h2to, 4)
+        call accumulate_properties (poly, 4)
+        call accumulate_properties (polyo, 4)
+        call accumulate_properties (polys, 4) 
+        call accumulate_properties (ht, 4)
+        ! call accumulate_properties (hts, 4)
+        ! call accumulate_properties (hto, 4)
         call accumulate_properties (anti, 4)
-        call accumulate_properties (poly2, 4)
         call accumulate_properties (full, 4)
-        call accumulate_properties (fulls, 4)
-        call accumulate_properties (fullo, 4)
+        ! call accumulate_properties (fulls, 4)
+        ! call accumulate_properties (fullo, 4)
         call accumulate_properties (percy, 4)
         call accumulate_properties (nclust, 4)
         call accumulate_properties (nematic, 4)
@@ -2646,17 +2746,16 @@ subroutine report_properties()
     call accumulate_properties (ke, 1)
     call accumulate_properties (temp, 1)
     call accumulate_properties (pv, 1)
-    call accumulate_properties (poly1, 1)
-    call accumulate_properties (poly1aa, 1)
-    call accumulate_properties (poly1abba, 1)
-    call accumulate_properties (poly1bb, 1)
-    call accumulate_properties (h2ts, 1)
-    call accumulate_properties (h2to, 1)
+    call accumulate_properties (poly, 1)
+    call accumulate_properties (polyo, 1)
+    call accumulate_properties (polys, 1)
+    call accumulate_properties (ht, 1)
+    ! call accumulate_properties (hts, 1)
+    ! call accumulate_properties (hto, 1)
     call accumulate_properties (anti, 1)
-    call accumulate_properties (poly2, 1)
     call accumulate_properties (full, 1)
-    call accumulate_properties (fulls, 1)
-    call accumulate_properties (fullo, 1)
+    ! call accumulate_properties (fulls, 1)
+    ! call accumulate_properties (fullo, 1)
     call accumulate_properties (percy, 1)
     call accumulate_properties (nclust, 1)
     call accumulate_properties (nematic, 1)
@@ -2682,17 +2781,16 @@ subroutine initialize_properties ()
     call accumulate_properties (temp, 0)
     call accumulate_properties (pv, 0)
     call accumulate_properties (z, 0)
-    call accumulate_properties (poly1, 0)
-    call accumulate_properties (poly1aa, 0)
-    call accumulate_properties (poly1abba, 0)
-    call accumulate_properties (poly1bb, 0)
-    call accumulate_properties (h2ts, 0)
-    call accumulate_properties (h2to, 0)
+    call accumulate_properties (poly, 0)
+    call accumulate_properties (polys, 0)
+    call accumulate_properties (polyo, 0)
+    call accumulate_properties (ht, 0)
+    ! call accumulate_properties (hts, 0)
+    ! call accumulate_properties (hto, 0)
     call accumulate_properties (anti, 0)
-    call accumulate_properties (poly2, 0)
     call accumulate_properties (full, 0)
-    call accumulate_properties (fulls, 0)
-    call accumulate_properties (fullo, 0)
+    ! call accumulate_properties (fulls, 0)
+    ! call accumulate_properties (fullo, 0)
     call accumulate_properties (percy, 0)
     call accumulate_properties (nclust, 0)
     call accumulate_properties (nematic, 0)
@@ -2741,19 +2839,18 @@ subroutine calculate_poperties()
     temp%value = 2. * ke%value / (real(ndim))
     call accumulate_properties (temp, 2)
     ! ** Order Parameters ****************************************
-    call determine_assembly (poly1%value, poly1aa%value, poly1abba%value, poly1bb%value, h2ts%value, &
-        h2to%value, anti%value, poly2%value, full%value, fulls%value, fullo%value)
-    call accumulate_properties (poly1, 2)
-    call accumulate_properties (poly1aa, 2)
-    call accumulate_properties (poly1abba, 2)
-    call accumulate_properties (poly1bb, 2)
-    call accumulate_properties (h2ts, 2)
-    call accumulate_properties (h2to, 2)
+    call determine_assembly (poly%value, polys%value, polyo%value, & 
+        ht%value, anti%value, full%value)
+    call accumulate_properties (poly, 2)
+    call accumulate_properties (polys, 2)
+    call accumulate_properties (polyo, 2)
+    call accumulate_properties (ht, 2)
+    ! call accumulate_properties (hts, 2)
+    ! call accumulate_properties (hto, 2)
     call accumulate_properties (anti, 2)
-    call accumulate_properties (poly2, 2)
     call accumulate_properties (full, 2)
-    call accumulate_properties (fulls, 2)
-    call accumulate_properties (fullo, 2)
+    ! call accumulate_properties (fulls, 2)
+    ! call accumulate_properties (fullo, 2)
     ! ** percolation *********************************************
     if (determine_percolation(nclust%value)) then 
         percy%value = 1.
@@ -2958,65 +3055,97 @@ subroutine update_orderlist(a, b)
     endif
 end subroutine update_orderlist
 
-subroutine determine_assembly (poly1, aa, abba, bb, head2tailsame, head2tailoppo, antiparallel, poly2, &
-    fullyassembeled, fullass_s, fullass_o)
+! TODO :: this program could be moved to a seperate module, which might be shared
+! between rods and squares
+subroutine determine_assembly (poly, poly_same, poly_oppo, ht, ap, ds)
     implicit none
     ! ** calling variables ***********************************
-    real(kind=dbl), intent(out) :: poly1, aa, abba, bb, head2tailsame, head2tailoppo, antiparallel, poly2, &
-    fullyassembeled, fullass_s, fullass_o
+    real(kind=dbl), intent(out) :: poly
+    real(kind=dbl), intent(out) :: poly_same
+    real(kind=dbl), intent(out) :: poly_oppo
+    real(kind=dbl), intent(out) :: ht
+    ! real(kind=dbl), intent(out) :: ht_same
+    ! real(kind=dbl), intent(out) :: ht_oppo
+    real(kind=dbl), intent(out) :: ap
+    real(kind=dbl), intent(out) :: ds
+    ! real(kind=dbl), intent(out) ds_same
+    ! real(kind=dbl), intent(out) ds_oppo
     ! ** local variables *************************************
     type(id), dimension(orderlength) :: ipartner, jpartner ! cube partners of polarized spheres 
     type(id) :: i, j
     integer :: n, m, iindex, jindex, o, p ! indexing 
-    logical :: samesame, sameoppo, samepartner, diffpartner, diffpartner_oppochai, diffpartner_samechai  ! logical values for recording the order
+    logical :: samesame, sameoppo, samepartner
+    logical :: diffpartner, diffpartner_oppochai, diffpartner_samechai, diffpartner_test  ! logical values for recording the order
 
 
     ! initialize values 
-    poly1 = 0.
-    aa = 0.
-    abba = 0. 
-    bb = 0.
-    head2tailsame = 0.
-    head2tailoppo = 0.
-    antiparallel = 0.
-    poly2 = 0.
-    fullyassembeled = 0.
-    fullass_s = 0.
-    fullass_o = 0.
+    poly = 0.
+    poly_same = 0.
+    poly_oppo = 0. 
+    ht = 0.
+    ! ht_same = 0.
+    ! ht_oppo = 0.
+    ap = 0.
+    ds = 0.
+    ! ds_same = 0.
+    ! ds_oppo = 0.
 
     eachcube: do n = 1, cube ! for each cube 
+
+        !! initialize routine
+
+        ! determine the group and oppositely charged spheres
         i%one = n 
         i%two = 1 ! first polarized particle is the first sphere
         j%one = n 
         j%two = 2 ! HARD CODE: second polarized particle is the second sphere
+
+        ! establish the partner array's and index's
         ipartner = nullset()
-        jpartner = nullset()
         iindex = 0
+        jpartner = nullset()
         jindex = 0
-        ! record cubic partners of i 
+
+        !! Determine the partners list of each charged sphere
+
+        ! record all oppositely charged partners of the positively charged sphere
         ilist: do m = 1, orderlength 
             if (idequiv(square(i%one)%circle(i%two)%orderlist(m), nullset())) exit
             ! record that partner 
             iindex = iindex + 1
             ipartner(iindex) = square(i%one)%circle(i%two)%orderlist(m) ! partner to polarized particle i 
         enddo ilist 
-        ! record cubic partners of j 
+
+        ! record all oppositely charged partners of the negatively charged sphere
         jlist: do m = 1, orderlength
             if (idequiv(square(j%one)%circle(j%two)%orderlist(m), nullset())) exit 
             ! record that partner 
             jindex = jindex + 1
             jpartner(jindex) = square(j%one)%circle(j%two)%orderlist(m) ! partner to polarized particle j 
         enddo jlist 
+
+        !! determine the assembly parameters of group n
+
         ! calculate the order of cube n 
-        samesame = .false.
-        sameoppo = .false.
-        samepartner = .false.
-        diffpartner = .false.
-        diffpartner_samechai = .false.
-        diffpartner_oppochai = .false.
+        !! single partner order parameters
+        samesame = .false. ! associated with at least one group of the same chirality
+        sameoppo = .false. ! associated with at least one group of the opposite chirality
+        !! multiple partner order parameters
+        samepartner = .false. ! the opposite charged spheres in group n share the same partner
+        diffpartner = .false. ! the opposite charged spheres in group n have one set of partners
+        ! that are different
+        diffpartner_samechai = .false. ! the different partners are of the same chirality
+        diffpartner_oppochai = .false. ! the different partners are of opposing chiralities
+
+        ! if only one of the charged spheres in group n have partners
         if ((iindex >= 1) .or. (jindex >= 1)) then ! if the square has at least one partner 
+
+            ! loop through all partners of the positively charged sphere
             if (iindex >= 1) then 
                 do o = 1, iindex
+                    ! determine if the partners are of the same chirality
+                    ! or a different chirality than the chirality assigned 
+                    ! to group n
                     if (square(n)%chai == square(ipartner(o)%one)%chai) then 
                         samesame = .true.
                     else
@@ -3024,8 +3153,13 @@ subroutine determine_assembly (poly1, aa, abba, bb, head2tailsame, head2tailoppo
                     endif
                 end do 
             endif
+
+            ! loop through all partners of the negatively charged sphere
             if (jindex >= 1) then 
                 do p = 1, jindex
+                    ! determine if the partners are of the same chirality or 
+                    ! a different chirality than the chirality assigned
+                    ! to group n
                     if (square(n)%chai == square(jpartner(p)%one)%chai) then 
                         samesame = .true.
                     else
@@ -3034,60 +3168,89 @@ subroutine determine_assembly (poly1, aa, abba, bb, head2tailsame, head2tailoppo
                 end do
             endif
         endif
-        if ((iindex >= 1) .and. (jindex >= 1)) then ! if both polarized particles have cubic partners
+
+        ! if both of the charged spheres in group n have partners
+        if ((iindex >= 1) .and. (jindex >= 1)) then 
+            ! compare all partners for either of the charged spheres in group n
 	        do o = 1, iindex
+                ! used to determine if the i has any partners that are of opposite charge
+                diffpartner_test = .true.
 	            do p = 1, jindex 
-                    ! if either of the polarized particles share the same cubic partners
-	                if (ipartner(o)%one == jpartner(p)%one) samepartner = .true. ! NOTE: this formation is only possible for same chirality squares
-                    ! if either of the polarized particles have different cubic partners 
-	                if (ipartner(o)%one /= jpartner(p)%one) then 
-                        diffpartner = .true.
-                        ! if the two different partners of the first and second polarized spheres share the same chiraility
-                        if (square(ipartner(o)%one)%chai == square(jpartner(p)%one)%chai) then 
-                            ! if the chairality of those partners is the same as the cube n
-                            if (square(n)%chai == square(ipartner(o)%one)%chai) then 
-                                diffpartner_samechai = .true.
-                            else 
-                                diffpartner_oppochai = .true.
-                            endif
-                        endif
+
+                    ! if either of the polarized particles share the SAME group partners
+	                if (ipartner(o)%one == jpartner(p)%one) then
+
+                        ! either charged particle is associated with the same opposite
+                        ! charges belonging to another group
+                        samepartner = .true.
+                        ! NOTE: this formation should only be possible for same chirality squares
+
+                        ! if the i partner is in the j partner list as well,
+                        ! then i cannot meet the different partner criteria
+                        diffpartner_test = .false.
+                        ! NOTE: the determination of this order parameter is
+                        !       different than previously performed in older
+                        !       iterations of this program
+
                     endif
-	            enddo
+                enddo
+
+                ! if the differnt partner test is still true
+                if (diffpartner_test) then 
+
+                    ! the current ipartner has not matched with any
+                    ! of the j partners, the different partner 
+                    ! conditional has been met
+                    diffpartner = .true.
+
+                    ! TODO :: add algorithm for differentiating between same and opposite
+                    !         chirality DS assemblies
+                    ! if the two different partners of the first and second polarized spheres share the same chiraility
+                    ! if (square(ipartner(o)%one)%chai == square(jpartner(p)%one)%chai) then 
+                    !     ! if the chairality of those partners is the same as the cube n
+                    !     if (square(n)%chai == square(ipartner(o)%one)%chai) then 
+                    !         diffpartner_samechai = .true.
+                    !     else 
+                    !         diffpartner_oppochai = .true.
+                    !     endif
+                    ! endif
+                endif
 	        enddo
 	    endif
-        if (samesame .or. sameoppo) poly1 = poly1 + 1.
-        if ((square(n)%chai == 1) .and. samesame) aa = aa + 1.
-        if ((square(n)%chai == 2) .and. samesame) bb = bb + 1.
-        if (sameoppo) abba = abba + 1.
-        if (samepartner) antiparallel = antiparallel + 1.
-        if (diffpartner) poly2 = poly2 + 1. 
-        if (diffpartner_samechai) head2tailsame = head2tailsame + 1.
-        if (diffpartner_oppochai) head2tailoppo = head2tailoppo + 1.
+
+        ! cumulate the assembly order parameters based on the logical criteria
+        if (samesame .or. sameoppo) then 
+            poly = poly + 1.
+            if (samesame) poly_same = poly_same + 1.
+            if (sameoppo) poly_oppo = poly_oppo + 1.
+        endif
+        if (samepartner) ap = ap + 1.
+        if (diffpartner) ht = ht + 1. 
+        ! if (diffpartner_samechai) head2tailsame = head2tailsame + 1.
+        ! if (diffpartner_oppochai) head2tailoppo = head2tailoppo + 1.
         if (iindex >= 2 .and. jindex >= 2) then 
-            fullyassembeled = fullyassembeled + 1.
-            if (diffpartner_oppochai .and. diffpartner_samechai) then 
-                fullass_o = fullass_o + 1.
-            else if (diffpartner_samechai .and. samepartner) then 
-                fullass_s = fullass_s + 1.
-            end if 
+            ds = ds + 1.
+            ! TODO :: update algorithm for differentiating between same
+            !         and opposite chirality double stranded structures
+            ! if (diffpartner_oppochai .and. diffpartner_samechai) then 
+            !     fullass_o = fullass_o + 1.
+            ! else if (diffpartner_samechai .and. samepartner) then 
+            !     fullass_s = fullass_s + 1.
+            ! end if 
         end if
     enddo eachcube
-    ! normalize order parameters by the number of cubes 
-    if (na /= 0) then ! if the system is not entirely b-chirality squares
-        aa = aa / real(na)
-    end if 
-    if (na /= cube) then ! if the system is not entirely a-chirality squares
-        bb = bb / real (cube - na)
-    end if
-    abba = abba / real (cube)
-    poly1 = poly1 / real(cube)
-    head2tailsame = head2tailsame / real(cube)
-    head2tailoppo = head2tailoppo / real(cube)
-    antiparallel = antiparallel / real(cube)
-    poly2 = poly2 / real(cube)
-    fullyassembeled = fullyassembeled / real(cube)
-    fullass_o = fullass_o / real(cube)
-    fullass_s = fullass_s / real(cube)
+
+    ! normalize order parameters by the number of groups 
+    poly = poly / real(cube)
+    poly_same = poly_same / real(cube)
+    poly_oppo = poly_oppo / real(cube)
+    ht = ht / real(cube)
+    ! head2tailsame = head2tailsame / real(cube)
+    ! head2tailoppo = head2tailoppo / real(cube)
+    ap = ap / real(cube)
+    ds = ds / real(cube)
+    ! fullass_o = fullass_o / real(cube)
+    ! fullass_s = fullass_s / real(cube)
 end subroutine determine_assembly
 
 ! // percolation // 
@@ -3122,7 +3285,7 @@ logical function determine_percolation (n_clusters) ! #percy
                 a%one = i 
                 a%two = m
                 call clusteranal (n, percolation, a)
-                if (percolation(1) .and. percolation(2)) determine_percolation = .true.
+                if (percolation(1) .or. percolation(2)) determine_percolation = .true.
             endif
         enddo
     enddo
@@ -3274,7 +3437,14 @@ subroutine determine_nematic(nematic)
         ! calculate the angle of the particle relative to the x-axis
         phi(i) = 0.
         do q = 1, ndim 
-            dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            ! the orientation of the square depends on the squares chirality
+            if (square(i)%chai == 1) then
+                ! if the chirality of the square is A
+                dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            else
+                ! if the chirality of the square is B
+                dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+            endif
             if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
             if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
             phi(i) = phi(i) + (dr%r(q) ** 2)
@@ -3288,12 +3458,13 @@ subroutine determine_nematic(nematic)
     ! calculate the difference in orientation between all cubic pairs 
     do i = 1, (cube - 1)
         do j = i + 1, cube 
-            nematic = nematic + (cos(phi(i) - phi(j)) ** 2)
+            nematic = nematic + (cos(2. * (phi(i) - phi(j))))
+            ! nematic = nematic + (cos(phi(i) - phi(j)) ** 2)
             nem_count = nem_count + 1
         enddo
     enddo
     nematic = nematic / real(nem_count) 
-    nematic = (3. * nematic - 1.) / 2.
+    ! nematic = 2. * nematic - 1
 end subroutine determine_nematic
 
 ! // allignment order parameter //
@@ -3328,7 +3499,14 @@ subroutine calculate_allignment(op)
         ! calculate the angle of the colloid relative to the x-axis
         phi(i) = 0.
         do q = 1, ndim 
-            dr%r(q) = rcircles(1)%r(q) - rcircles(mer)%r(q) ! orientation of rod from first to last disc
+            ! the orientation of the square depends on the squares chirality
+            if (square(i)%chai == 1) then
+                ! if the chirality of the square is A
+                dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            else
+                ! if the chirality of the square is B
+                dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+            endif
             if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
             if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
             phi(i) = phi(i) + (dr%r(q) ** 2)
@@ -4047,11 +4225,17 @@ subroutine field_ghost_collision(impulse)
 
     ! determine the direction of the field vector
     if (field_rotation) then 
+        ! the field is rotating
+        ! field points constantly in the direction of the y-axis
+        field_vec = get_field_vec(angvel = external_field_angvel, time = timenow)
+        ! scale the vector by the magnitude of the interaction
+        field_vec%d = field_vec%d * impulse
         ! TODO :: implement field rotation
-        write (*,*) 'TODO :: IMPLEMENT FIELD ROTATION'
+        ! write (*,*) 'TODO :: IMPLEMENT FIELD ROTATION'
     else
         ! the field is not rotating
         ! field points constantly in the direction of the y-axis
+        ! TODO :: set default orientation and pass to the method
         field_vec = get_field_vec()
         ! scale the vector by the magnitude of the interaction
         field_vec%d = field_vec%d * impulse
@@ -4147,8 +4331,8 @@ type(vec) function get_field_vec (ori, angvel, time)
 
     ! if the angular velocity and time were passed to the method
     if (present(angvel) .and. present(time)) then 
-        get_field_vec%d(1) = cos((time / angvel) * twopi)
-        get_field_vec%d(2) = sin((time / angvel) * twopi)
+        get_field_vec%d(1) = cos((time * angvel))! * twopi)
+        get_field_vec%d(2) = sin((time * angvel))! * twopi)
     endif 
 end function get_field_vec
 

@@ -132,11 +132,11 @@ get_annealid () {
 	D3=$(printf '%02d' ${ETA})
 	D3="e${D3}"
 	# fourth directory is the number of replicates
-	# D4=$(printf '%02d' ${REP})
-	# D4="r${D4}"
+	D4=$(printf '%02d' ${REP})
+	D4="r${D4}"
 
 	# generate the directory and return to user
-	local ID=${D1}${D2}${D3}
+	local ID=${D1}${D2}${D3}${D4}
 	echo $ID
 }
 

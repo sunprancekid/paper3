@@ -33,6 +33,7 @@ POLSQU_MOD=polsqu2x2_mod
 POLSQU_SIM=polsqu2x2_sim
 TESTH_SIM=testH
 CONH_SIM=conH
+ROTH_SIM=rotH
 
 polsqu_test: clean
 	# compile module, simulation program
@@ -67,7 +68,14 @@ polsqu_conH_anneal:
 	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(CONH_SIM).f90
 	# link module and program
 	$(FORT) -o $(CONH_SIM).ex $(CONH_SIM).o $(POLSQU_MOD).o
-	./$(CONH_SIM).ex 1 conH test 0.2 12 1.0 0.5 3.0 1000000 0.96
+	./$(CONH_SIM).ex 1 conH test 0.2 12 1.0 0.5 3.0 50000000 0.96
+
+polsqu_rotH: 
+	# compile the module, simulation program
+	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(ROTH_SIM).f90
+	# link module and program
+	$(FORT) -o $(ROTH_SIM).ex $(ROTH_SIM).o $(POLSQU_MOD).o
+	./$(ROTH_SIM).ex 1 $(ROTH_SIM) test 0.55 16 0.5 10.0 1.0 0.3 100000000 0.96
 
 
 # rod3_test: clean

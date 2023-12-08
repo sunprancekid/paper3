@@ -113,7 +113,7 @@ elif [[ JOB_BOOL -eq 1 ]]; then
     # with the local simulations corresponding to the job id (JOB)
     rsync -Pavz "${LOGIN}:${LOC}${JOB}/" "./${JOB}/"
 
-    # echo "TODO upload simupdate program"         
+    # echo "TODO upload simupdate program"   
     # ./simbin/java/SimUpdate.sh ${JOB} true
 
 elif [[ SAVE_BOOL -eq 1 ]]; then 
