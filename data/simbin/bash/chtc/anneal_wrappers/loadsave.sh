@@ -71,7 +71,7 @@ check_retries() {
 			else
 				# otherwise decriment the integer
 				((NEXT_DIR_INT-=1))
-			if
+			fi
 		fi
 
 		# store the next integer in the next directory file

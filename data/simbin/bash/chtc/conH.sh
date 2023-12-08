@@ -723,8 +723,8 @@ shift $((OPTIND-1))
 ## SCRIPT
 # establish initial directories, file names
 SIMID=${SIM_MOD}c${CELL}
-# D0=${JOB}/${SIMID}
-D0=${JOB}/${SIM_MOD}_c${CELL}
+D0=${JOB}/${SIMID}
+# D0=${JOB}/${SIM_MOD}_c${CELL}
 JOBID=${JOB}_${SIMID}
 # name of file containing simulation parameters
 SIMPARAM_FILE=${D0}/${JOBID}.csv
