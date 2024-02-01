@@ -80,12 +80,12 @@ RETRY_VAL=$4
 OUTNAME="${JOB}${SIMID}_stdout.txt"
 
 # determine the operation to perform
-if [[ BOOL_INIT -eq 1 ]]; then 
+if [[ $BOOL_INIT -eq 1 ]]; then 
 	./savesave.sh -i -e $EXIT_VAL $JOB $SIMID $RETRY_VAL >> "${OUTNAME}" 2>&1
-elif [[ BOOL_ANNEAL -eq 1 ]]; then 
+elif [[ $BOOL_ANNEAL -eq 1 ]]; then 
 	./savesave.sh -a "${ANNEAL_TEMP}" -e $EXIT_VAL $JOB $SIMID $RETRY_VAL >> "${OUTNAME}" 2>&1
-elif [[ BOOL_RERUN -eq 1 ]]; then
-	./savesave -r ${RERUN_IT} -e $EXIT_VAL $JOB $SIMID $RETRY_VAL >> "${OUTNAME}" 2>&1
+elif [[ $BOOL_RERUN -eq 1 ]]; then
+	./savesave.sh -r ${RERUN_IT} -e $EXIT_VAL $JOB $SIMID $RETRY_VAL >> "${OUTNAME}" 2>&1
 fi
 
 exit 0

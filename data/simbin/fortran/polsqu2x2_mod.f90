@@ -806,11 +806,11 @@ subroutine set_square_movie (status, freq)
     endif
 end subroutine set_square_movie
 
-subroutine set_thermostat (status, freq) 
+subroutine set_thermostat (status, temp, freq) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if thermostat should be turned on or off
-    ! real, intent(in), optional :: temp 
+    real, intent(in), optional :: temp 
     ! temperature set point of thermostat, strength of ghost collisions
     real, intent(in), optional :: freq
     ! frequency of thermostat ghost collisions per particle
@@ -827,14 +827,14 @@ subroutine set_thermostat (status, freq)
         endif 
     endif
 
-    ! if (present(temp)) then 
-    !     ! check that the value is greater than zero
-    !     if (set_temperature(temp)) then 
-    !         use_default_temperature = .false.
-    !         1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
-    !         write (*,1) tempset
-    !     endif
-    ! endif
+    if (present(temp)) then 
+        ! check that the value is greater than zero
+        if (set_temperature(temp)) then 
+            use_default_temperature = .false.
+            1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
+            write (*,1) tempset
+        endif
+    endif
 
     if (present(freq)) then 
         ! check that the value is greater than zero

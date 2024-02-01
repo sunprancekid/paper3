@@ -8,13 +8,13 @@
 program testH
     use polarizedsquaremodule
     implicit none
-    integer, parameter :: N_ARGS = 7 ! number of arguments accepted by simulation file
+    integer, parameter :: N_ARGS = 6 ! number of arguments accepted by simulation file
     integer :: a  ! number of arguments determined by program
     character(len=12), dimension(:), allocatable :: args
     real :: area_frac ! simulation area fraction
     integer :: events ! length of simulation
     integer :: cell_size ! simulation cell size
-    real :: tset, vmag, ffrq ! testH parameters
+    real :: tset, X, field_strength ! testH parameters
 
     ! parse the number of arguments passed to the program
     a = command_argument_count()
@@ -38,24 +38,23 @@ program testH
     read (args(2), *) events ! second argument is the number of simulation events
     read (args(3), *) cell_size ! third argument is the cell size of the simulation
     read (args(4), '(f6.4)') tset ! fourth argument is the temperature set point of the simulation
-    read (args(5), '(f6.4)') vmag ! fifth argument is the velocity magnitude for collisions
-    read (args(6), '(f6.0)') ffrq ! sixth argument is the frequency of field collisions
-    ! the seventh value passed to the method is simid for the testH job
+    read (args(5), '(f6.4)') X ! fifth argument passed to the method is the ratio magnetic to thermal energy
+    ! the sixth value passed to the method is simid for the testH job
 
-    ! increment vmag if it is equal to zero
-    if (.not. (vmag > 0.)) then
-        vmag = vmag + 0.0001
-    endif
+    ! use the temperature set point and ratio of magnetic to thermal energy to
+    ! calculate the external field strength
+    field_strength = X * tset / 1.0
+    ! for squares with standard dipoles, degree of charge seperation is one
 
     ! initialize simulation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1000.)
     call set_thermostat (status = .true., temp = tset, freq = 0.1)
-    call set_external_field (status = .true., freq = ffrq, force = vmag)
+    call set_external_field (status = .true., strength = field_strength)
 
     ! initialize system
-    call initialize_system(job = "testH", sim = trim(args(7)))
+    call initialize_system(job = "testH", sim = trim(args(6)))
 
     ! run the simulation if the parameters are met
     do

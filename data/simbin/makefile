@@ -54,7 +54,7 @@ polsqu_testH: clean
 	$(FORT) -O3 $(DEBUG) -c $(FORTBIN)/$(POLSQU_MOD).f90 $(FORTBIN)/$(TESTH_SIM).f90
 	# link module and program
 	$(FORT) -o polsqu_test.ex $(TESTH_SIM).o $(POLSQU_MOD).o
-	./polsqu_test.ex 0.2 10000000 16 0.25 0.0 400 testH
+	./polsqu_test.ex 0.15 10000000 24 0.25 0.0 testH
 
 polsqu_conH_init: clean
 	# compile module, simulation program
