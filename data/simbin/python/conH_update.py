@@ -57,6 +57,7 @@ def plot_temp_time_series (save_path, time, temp):
 
 	# loop through temperature points, assign temperature corresponding to time
 	j = 0 
+	# print(time)
 	curr_time = time[j]
 	for i in range(len(ds_time)):
 
@@ -78,7 +79,7 @@ def plot_temp_time_series (save_path, time, temp):
 	plt.suptitle('Annealing Simulation Temperature', fontsize=14)
 	# plt.title('($S_{{ub}} = {:.2f}$, $N_{{squares}} = {:d}$)'.format(ub_val, n_squares), fontsize=14)
 	# plt.show()
-	plt.savefig(save_path, bbox_inches='tight', dpi = 200) # bbox_inches='tight', 
+	plt.savefig(save_path, bbox_inches='tight', dpi = 200)
 	plt.close(fig)
 
 # method used to compile results from the simulation, report the current
@@ -131,11 +132,12 @@ def update_simulation_results(sim_parm):
 		# establish the annealing file
 		anneal_dir = "/anneal/{:03d}/".format(anneal_int_list[i])
 		anneal_file = sim_parm.path + anneal_dir + sim_parm.jobid + sim_parm.simid + "_anneal.csv"
+		# print(anneal_dir)
 
 		# establish that the file exists
 		if not os.path.exists(anneal_file):
 			# if the path does not exist, break from the loop
-			break
+			continue
 
 		# parse the results from the simulation
 		f = open(anneal_file, 'r')
@@ -147,7 +149,14 @@ def update_simulation_results(sim_parm):
 			results = results[1].split(',')
 		else:
 			# otherwise, break from the loop
-			break
+			continue
+
+		# check that the number of items in the result line is the same
+		# as the number of items in the results header
+		if len(head) != len(results):
+			# if they are not equal, break skip this annealing iteration,
+			# and move to the next one
+			continue 
 
 		# create a dictionary that contains the results formatted according to the header
 		prop_dict = {}

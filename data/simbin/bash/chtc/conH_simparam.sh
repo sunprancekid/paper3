@@ -19,7 +19,7 @@ declare -i FIELD_BOOL=0
 # minimum field strength
 declare -i FIELD_MIN=0
 # maximum field strength
-declare -i FIELD_MAX=20
+declare -i FIELD_MAX=60
 # amount the external field strength is incremented by
 declare -i FIELD_INC=2
 
@@ -253,10 +253,11 @@ gen_conXA () {
 	fi
 	# establish the file that contains the simulation parameters for the constant field strength value
 	XA_FILE=${D0}/summary/XA/${JOB}_a${XA_STRING}.csv
-	if [[ ! -f $XA_FILE ]]; then
-		# if the file does not exist, write the header to the file
-		echo $HEADER > $XA_FILE
-	fi
+	echo $HEADER > $XA_FILE # restart the file, even if it already exists
+	# if [[ ! -f $XA_FILE ]]; then
+	# 	# if the file does not exist, write the header to the file
+	# 	echo $HEADER > $XA_FILE
+	# fi
 	# inform the user
 	echo -e "conH_simparam :: Generating simulations for a-chirality fraction value of ${XA_VALUE} (${REPLICATES} replicates)."
 
@@ -285,21 +286,22 @@ gen_conXA () {
 				ANNEALID=$(get_annealid $XA_INT $H_INT $ETA_INT $R)
 				# establish the simulation parameter string
 				SIMPARAM_STRING="${JOB},${ANNEALID},${XA_VALUE},${H_VALUE},${ETA_VALUE},${R},${SIMDIR}"
+				
+				# write the parameters to the main simulation parameter file
+				echo $SIMPARAM_STRING >> $SIMPARAM_FILE
+				# write the simulation parameters to the conH file
+				echo $SIMPARAM_STRING >> $XA_FILE
 
 				# check if the directory exists
 				if [[ ! -d $SIMDIR ]]; then
-					if [[ VERB_BOOL -eq 1 ]]; then
+					if [[ $VERB_BOOL -eq 1 ]]; then
 						echo "conH_simparam :: Establishing $SIMDIR .."
 					fi
 					# if it does not, initialize the path to the directory
 					mkdir -p $SIMDIR # directories are generated in the conH submssion / analysis script
-					# write the parameters to the main simulation parameter file
-					echo $SIMPARAM_STRING >> $SIMPARAM_FILE
-					# write the simulation parameters to the conH file
-					echo $SIMPARAM_STRING >> $XA_FILE
 				else
 					# if the directory does exist, the parameter should already be stored in the main sim param file
-					if [[ VERB_BOOL -eq 1 ]]; then
+					if [[ $VERB_BOOL -eq 1 ]]; then
 						echo "conH_simparam :: $SIMDIR has already been established .."
 					fi
 				fi
@@ -415,8 +417,8 @@ while getopts "d:h:x:r:v" options; do
 			declare -i ETA=${OPTARG}
 
 			# check that the value passed to the method is within the specified bounds
-			if [[ ETA -lt ETA_MIN || ETA -gt ETA_MAX ]]; then
-				if [[ ETA -lt ETA_MIN ]]; then 
+			if [[ $ETA -lt $ETA_MIN || $ETA -gt $ETA_MAX ]]; then
+				if [[ $ETA -lt $ETA_MIN ]]; then 
 					echo "conH_simparam :: density value passed to script (${ETA}) is below the minimum allowable value (${ETA_MIN})."
 				else
 					echo "conH_simparam :: density value passed to script (${ETA}) is greater than the maximum allowable value (${ETA_MAX})."
@@ -434,8 +436,8 @@ while getopts "d:h:x:r:v" options; do
 			declare -i FIELD=${OPTARG}
 
 			# check that the value is within the bounds
-			if [[ FIELD -lt FIELD_MIN || FIELD -gt FIELD_MAX ]]; then
-				if [[ FIELD -lt FIELD_MIN ]]; then 
+			if [[ $FIELD -lt $FIELD_MIN || $FIELD -gt $FIELD_MAX ]]; then
+				if [[ $FIELD -lt $FIELD_MIN ]]; then 
 					echo "conH_simparam :: field value passed to script (${FIELD}) is below the minimum allowable value (${FIELD_MIN})."
 				else
 					echo "conH_simparam :: field value passed to script (${FIELD}) is greater than the maximum allowable value (${FIELD_MAX})."
@@ -453,8 +455,8 @@ while getopts "d:h:x:r:v" options; do
 			declare -i XA=${OPTARG}
 
 			# check that the value is within the bounds
-			if [[ XA -lt XA_MIN || XA -gt XA_MAX ]]; then
-				if [[ XA -lt XA_MIN ]]; then 
+			if [[ $XA -lt $XA_MIN || $XA -gt $XA_MAX ]]; then
+				if [[ $XA -lt $XA_MIN ]]; then 
 					echo "conH_simparam :: field value passed to script (${XA}) is below the minimum allowable value (${XA_MIN})."
 				else
 					echo "conH_simparam :: field value passed to script (${XA}) is greater than the maximum allowable value (${XA_MAX})."
@@ -469,7 +471,7 @@ while getopts "d:h:x:r:v" options; do
 			REPLICATES=${OPTARG}
 
 			# check the value passed to the script is not less than 1
-			if [[ REPLICATES -lt 1 ]]; then
+			if [[ $REPLICATES -lt 1 ]]; then
 				echo "conH_simparam :: replicate value passed to script ($REPLICATES) less than the allowable minimum (1)."
 				exit $NONZERO_EXITCODE
 			fi
@@ -519,19 +521,19 @@ fi
 
 ## according to the options that were called, generate simulation parameteres
 # constant field simulations
-if [[ FIELD_BOOL -eq 1 ]]; then 
+if [[ $FIELD_BOOL -eq 1 ]]; then 
 	# generate constant field surface corresponding to integer passed to the script
 	gen_conH $FIELD
 fi 
 
 # constant density simulations
-if [[ ETA_BOOL -eq 1 ]]; then
+if [[ $ETA_BOOL -eq 1 ]]; then
 	# generate constant density surface corresponding to the integer passed to the script
 	gen_conETA $ETA
 fi
 
 # constant a-chirality fraction simulations
-if [[ XA_BOOL -eq 1 ]]; then 
+if [[ $XA_BOOL -eq 1 ]]; then 
 	# generate constant a-chirality fraction surface corresponding to the integer passed to the script
 	gen_conXA $XA
 fi

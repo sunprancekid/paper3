@@ -33,49 +33,46 @@ simparam_header = "n,simid,rp,temp_set,vmag_set,ffrq_set"
 
 ## ARGUMENTS
 # first arg: path to directory containing files
-path = sys.argv[1]
+# path = sys.argv[1]
 
 
 ## FUNCTIONS
-"""function for parsing data from simulation results"""
-def parse_simulation_data(simulation_path):
+"""function for parsing data from simulation results. Returns
+	data frame containing averaged simulation results."""
+def parse_simulation_data(path='./', header = None, T_col = None, X_col = None, id_col = None, verbose = verb, properties = ['temp', 'mag']):
 	# open file containing simulation parameters
 	simparam_file = path + "testH.csv"
 	# header used by testH_simparam : "n,simid,rp,area_frac,events,cell,temp,vmag,ffrq"
-	simparam_data = pd.read_csv(simparam_file, names=testH_header)
+	simparam_df = pd.read_csv(simparam_file, header = None, names=header)
 	# inform user
-	if verb:
+	if verbose:
 		print (f"Parsing testH simulation data from {simparam_file} ..")
 
 	# translate columns to unique lists
-	n = simparam_data['n'].tolist()
-	simid = simparam_data['simid'].tolist()
-	rp = simparam_data['rp'].tolist()
-	temp_set = simparam_data['temp_set'].tolist()
-	vmag_set = simparam_data['vmag_set'].tolist()
-	ffrq_set = simparam_data['ffrq_set'].tolist()
+	simid = simparam_df[id_col].tolist()
+	T_set = simparam_df[T_col].tolist()
+	X_set = simparam_df[X_col].tolist()
 
 	# get the header for the results files
-	# print(simid[0])
-	anneal_file = path + "anneal/" + simid[0] + "_" + str(rp[0]) + "_anneal.csv"
+	anneal_file = path + "anneal/" + simid[0] + "_anneal.csv"
 	f = open(anneal_file, 'r')
 	anneal_header = f.readlines()
-	header = simparam_header + "," + anneal_header[0]
+	header = f"{id_col},{T_col},{X_col}," + anneal_header[0]
 	f.close()
 
 	# loop through all simulation parameters
 	# parse sim data for file writing
-	n_sims = len(simparam_data.index)
+	n_sims = len(simparam_df.index)
 	success = [ "" for _ in range(n_sims)]
 	failure = [ "" for _ in range(n_sims)]
 	a = 0 # successful simdata counter
 	b = 0 # failed simdata counter
 	for i in range(0, (n_sims)):
 		# determine the annealing file
-		anneal_file = path + "anneal/" + simid[i] + "_" + str(rp[i]) + "_anneal.csv"
+		anneal_file = path + "anneal/" + simid[i] + "_anneal.csv"
 		
 		# check if the file exists, parse results
-		simresults = f"{n[i]},{simid[i]},{rp[i]},{temp_set[i]},{vmag_set[i]},{ffrq_set[i]}"
+		simresults = f"{simid[i]},{T_set[i]},{X_set[i]}"
 		isValid = True # used for debugging
 		if os.path.exists(anneal_file):
 			# open the file
@@ -105,32 +102,59 @@ def parse_simulation_data(simulation_path):
 			# iterate, skip the entry
 			b += 1
 
-	# add data to dataframe
-	simdata = pd.DataFrame({'success': success, 'failure': failure})
-	# print(f"{simdata.dtypes}")
-	# print(f"{simdata}")
-	# exit()
+	# report the successful and un-successful simulation data to the user
+	if verbose:
+		print(f"From {n_sims} simulations, {a} completed successfully and {b} failed.")
+
+	## write successful and unsuccessful simulation data to analysis file
+	anal_path = path + 'anal/'
+	if not os.path.exists(anal_path):
+		os.makedirs(anal_path)
+
 	# open file, write header and data to file
 	print(f"Parsing complete. Writing to file ..")
-	anal_file = path + "testH_anal.csv"
+	anal_file = anal_path + "testH_success.csv"
 	with open(anal_file, 'w') as f:
 		# write header
-		f.write(f"{header}")
-		print(f"\nNumber of successful jobs is {a}")
+		f.write(f"{header}\n")
 		for i in range(a):
-			f.write(f"{success[i]}")
-
+			f.write(f"{success[i]}\n".replace(" ", ""))
 	f.close()
 
-	fail_file = path + "testH_fail.csv"
+	fail_file = anal_path + "testH_fail.csv"
 	with open(fail_file, 'w') as f:
 		# write header
 		f.write(f"{simparam_header}\n")
-		print(f"Number of failed jobs is {b}")
 		for i in range(b):
-			f.write(f"{failure[i]}\n")
-
+			f.write(f"{failure[i]}\n".replace(" ", ""))
 	f.close()
+
+	## average results for unique combinations of the desired properties
+	# create a data frame that contains the successful data
+	df = pd.read_csv(anal_path + "testH_success.csv")
+	result_header = f"{T_col},{X_col}"
+	for p in properties:
+		result_header = result_header + f",{p}"
+	results = []
+	for t in df[T_col].unique().tolist():
+		for x in df[X_col].unique().tolist():
+			result_string = f"{t},{x}"
+			result_df = df.loc[(df[T_col] == t) & (df[X_col] == x)]
+			for p in properties:
+				result_string = result_string + ",{:.3f}".format(result_df[p].mean())
+			results.append(result_string)
+
+	# write the results to file
+	results_file = anal_path + "testH_anal.csv"
+	with open(results_file, 'w') as f:
+		# write header
+		f.write(f"{result_header}\n")
+		for i in range(len(results)):
+			f.write(f"{results[i]}\n".replace(" ", ""))
+	f.close()
+
+	# return a dataframe containing the averaged results to the user
+	return pd.read_csv(results_file)
 
 """ function that takes data from testH simulations,
 	and parses the values that correspond to one constant temperature
@@ -314,9 +338,10 @@ def gen_conT_graph (conT_path, conT_val):
 	plt.savefig(save_dir + fig_name, dpi = 600)
 
 ## SCRIPT
-# parse simulation data
-parse_simulation_data(path)
-# parse the constantT data
-parse_conT_data(path, 0.25)
-# generate graph
-gen_conT_graph(path, 0.25)
+if __name__ == '__main__':
+	# parse simulation data
+	parse_simulation_data(path)
+	# parse the constantT data
+	parse_conT_data(path, 0.25)
+	# generate graph
+	gen_conT_graph(path, 0.25)

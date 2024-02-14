@@ -582,7 +582,6 @@ end subroutine initialize_simulation_settings
 
 subroutine initialize_cell_neighbor_list() 
     implicit none 
-
     nbrRadiusMin = (nbrRadiusMinInt / (nbrRadiusMinInt - 1)) * (sigma3 - (sigma1 / nbrRadiusMinInt)) ! minimum required radius
     nbrRadius = max(sqrt((real(nbrListSize) / (real(mer) * density)) * (1.0 / pi)), nbrRadiusMin) ! radius of neighborlist
     nbrDispMax = (nbrRadius - sigma1) / nbrRadiusMinInt ! max particle displacement before a neighborlist update is required
@@ -806,11 +805,11 @@ subroutine set_square_movie (status, freq)
     endif
 end subroutine set_square_movie
 
-subroutine set_thermostat (status, freq) 
+subroutine set_thermostat (status, temp, freq) 
     implicit none 
     logical, intent(in), optional :: status 
     ! boolean that determines if thermostat should be turned on or off
-    ! real, intent(in), optional :: temp 
+    real, intent(in), optional :: temp 
     ! temperature set point of thermostat, strength of ghost collisions
     real, intent(in), optional :: freq
     ! frequency of thermostat ghost collisions per particle
@@ -827,14 +826,14 @@ subroutine set_thermostat (status, freq)
         endif 
     endif
 
-    ! if (present(temp)) then 
-    !     ! check that the value is greater than zero
-    !     if (set_temperature(temp)) then 
-    !         use_default_temperature = .false.
-    !         1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
-    !         write (*,1) tempset
-    !     endif
-    ! endif
+    if (present(temp)) then 
+        ! check that the value is greater than zero
+        if (set_temperature(temp)) then 
+            use_default_temperature = .false.
+            1 format(" set_temperature :: thermostat temperature was set to ", F6.3,".")
+            write (*,1) tempset
+        endif
+    endif
 
     if (present(freq)) then 
         ! check that the value is greater than zero
@@ -843,6 +842,8 @@ subroutine set_thermostat (status, freq)
             2 format(" set_thermostat :: unable to assign thermostat ghost collision frequency. ", &
                 "value passed to method (", F6.1,") is less than zero.")
             write (*,2) freq 
+            ! assign the default frequency
+            thermostat_freq = (default_thermostat_freq * cube) / (density ** (1./2.))
         else
             ! frequency value is greater than zero 
             3 format (" set_thermostat :: thermostat ghost collision frequency set to ", &
@@ -1249,7 +1250,7 @@ subroutine initialize_system (job, sim)
 
     ! initialize groupings
     call reset_state ()
-    call initial_state()
+    call initial_state ()
     call set_position ()
     call set_velocity ()
     call set_chairality ()

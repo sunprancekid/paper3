@@ -67,11 +67,11 @@ OUTNAME="${JOB}${SIMID}_stdout.txt"
 
 # determine operation and execute
 # redirect standard out and error
-if [[ BOOL_LOADINIT -eq 1 ]]; then
+if [[ $BOOL_LOADINIT -eq 1 ]]; then
 	./loadsave.sh -i $JOB $SIMID >> "${OUTNAME}" 2>&1
-elif [[ BOOL_LOADLAST -eq 1 ]]; then 
+elif [[ $BOOL_LOADLAST -eq 1 ]]; then 
 	./loadsave.sh -l $JOB $SIMID >> "${OUTNAME}" 2>&1
-elif [[ BOOL_RERUN -eq 1 ]]; then 
+elif [[ $BOOL_RERUN -eq 1 ]]; then 
 	./loadsave.sh -r $RERUN_IT $JOB $SIMID >> "${OUTNAME}" 2>&1
 else 
 	echo "Operation not specified." >> "${OUTNAME}" 2>&1

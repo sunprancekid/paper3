@@ -1,5 +1,5 @@
 # !/bin/bash
-set -e
+# set -e
 
 ## Matthew Dorsey
 ## 2023.08.07
@@ -42,19 +42,20 @@ declare -i CLEAR_DIR_BOOL=0
 # default job title, unless overwritten
 JOB="conH"
 # simulation module title
-SIM_MOD="polsqu2x2"
+# SIM_MOD="polsqu2x2"
+SIM_MOD="squ2"
 # default simulation cell size, unless overwritten
 declare -i CELL=32
 # starting temperature of annealing simulation
 INIT_ANNEAL_TEMP="3.0"
 # final annealing temperature of an annealing simulation
-FINAL_ANNEAL_TEMP="0.01"
+FINAL_ANNEAL_TEMP="0.05"
 # number of replicates to perform per simulation
-declare -i NUM_REPLICATES=3
+declare -i NUM_REPLICATES=1
 # default number of simulation events, unless specified by user
 declare -i EVENTS=250000000
 # default fraction used to decrease simulation temperature
-declare -i FRAC=96
+declare -i FRAC=98
 # TODO :: replicates are not actually implemented
 
 
@@ -120,7 +121,7 @@ gensimdir () {
 
 	## SCRIPT
 	# inform user
-	if [[ VERB_BOOL -eq 1 ]]; then 
+	if [[ $VERB_BOOL -eq 1 ]]; then 
 		echo -e "\nGenerating annealing simulation (${ANNEALID}) in: ${D}"
 	fi
 
@@ -136,16 +137,16 @@ gensimdir () {
 	if [[ -d "${D}/anneal" ]]; then 
 		# if the subdag exists, then the directory has been initialized
 		# check if the directory should be over written
-		if [[ OVERWRITE_BOOL -eq 1 ]]; then 
+		if [[ $OVERWRITE_BOOL -eq 1 ]]; then 
 			declare -i GEN_DIR=1
 			rm -r ${D}/* # empty the directory and restart
 			# inform user 
-			if [[ VERB_BOOL -eq 1 ]]; then
+			if [[ $VERB_BOOL -eq 1 ]]; then
 				echo "Directory already exists. Overwriting .."
 			fi
 		else
 			# inform the user
-			if [[ VERB_BOOL -eq 1 ]]; then
+			if [[ $VERB_BOOL -eq 1 ]]; then
 				echo "Directory already exists."
 			fi
 		fi
@@ -154,7 +155,7 @@ gensimdir () {
 		# then the directory has not been initialized
 		declare	-i GEN_DIR=1
 		# inform the user
-		if [[ VERB_BOOL -eq 1 ]]; then 
+		if [[ $VERB_BOOL -eq 1 ]]; then 
 			echo "Generating directory .."
 		fi
 	fi
@@ -162,7 +163,7 @@ gensimdir () {
 	# if it does not, generate subdirectories
 	# or, if overwrite is true, delete the directory
 	# re-generate everything
-	if [[ GEN_DIR -eq 1 ]]; then
+	if [[ $GEN_DIR -eq 1 ]]; then
 		mkdir -p $D
 
 		# generate subdirectories
@@ -189,7 +190,7 @@ gensimdir () {
 
 		# determine the nodes to intialize based on the number of annealing
 		# simulations that have been performed
-		if [[ N_ANNEAL -le 0 ]];
+		if [[ $N_ANNEAL -le 0 ]];
 		then
 			# if no annealing simulations have been performed
 			# establish the initial annealing
@@ -208,15 +209,43 @@ gensimdir () {
 
 			# if some annealing simulations have been performed
 			# rerun all of the previous annealing simulations
-			if [[ RERUN_BOOL -eq 1 ]]; then
+			if [[ $RERUN_BOOL -eq 1 ]]; then
 				echo "Rerunning previous annealing nodes."
 				declare -i ANNEAL_IT=0
 				while (("$ANNEAL_IT" < "$N_ANNEAL"))
-				do
-					# if [[ ANNEAL_IT -eq 2 ]]; then 
-					# 	exit 0
+				do 
+					# # execute the post script wrapper
+					RERUN_DIR=$(printf '%03d' ${ANNEAL_IT})
+					# ANNEAL_TMP_DIR=${D}anneal/tmp/${RERUN_DIR}
+					# 	if [[ -d $ANNEAL_TMP_DIR ]]; then
+					# 	# move to the annealing directory
+					# 	MAIN_DIR=$PWD
+					# 	cd ${D}
+					# 	echo $PWD
+					# 	# execute the post script
+					# 	echo ./postscript-wrapper.sh -r ${ANNEAL_IT} ${JOBID} ${ANNEALID} 0 0
+					# 	# ./savesave -r ${ANNEAL_IT} -e 0 ${JOBID} ${ANNEALID} 0
+					# 	SIM_FILES=(./anneal/tmp/${RERUN_DIR}/${JOBID}${ANNEALID}*)
+					# 	for f in ${SIM_FILES[@]}; do
+					# 		echo $f
+					# 		cp "$f" "./anneal/${RERUN_DIR}/"
+					# 	done
+					# 	# return to the main directory
+					# 	cd $MAIN_DIR
+					# 	echo $PWD
+					# else
+					# 	echo "$ANNEAL_TMP_DIR does not exist."
 					# fi
-					genCHTCanneal_rerun $ANNEAL_IT
+
+					# check if the magnetization order parameter is in the
+					# header of the annealing file
+					ANNEAL_FILE=${D}anneal/${RERUN_DIR}/${JOBID}${ANNEALID}_anneal.csv
+					HEADER=$(head -n 1 ${ANNEAL_FILE} | cut -d , -f 25 | sed 's/ //g')
+					if [[ -z $HEADER ]]; then
+						echo "Rerunning ${JOBID}${ANNEALID}_${RERUN_DIR} .."
+						genCHTCanneal_rerun $ANNEAL_IT
+					fi
+
 					declare -i ANNEAL_IT=$((ANNEAL_IT+1))
 					# echo "$ANNEAL_IT is less than $N_ANNEAL"
 				done
@@ -234,6 +263,8 @@ gensimdir () {
 		fi
 	fi
 
+	# return
+
 	## add / write files to the directory
 	# copy fortran files to the directory
 	for ff in ${FORTRAN_FILES[@]}; do
@@ -248,6 +279,7 @@ gensimdir () {
 		# delete the file
 		rm "${D}${JOBID}${ANNEALID}_stdout.txt"
 	fi
+	gendir "${D}out"
 
 	# write the executable to the simulation directory
 	echo "# !/bin/bash" > $EXEC_PATH # shebang!!
@@ -327,7 +359,7 @@ genCHTCinit() {
 
 	## SCRIPT
 	# if verbose, inform the user
-	if [[ VERB_BOOL -eq 1 ]]; then 
+	if [[ $VERB_BOOL -eq 1 ]]; then 
 		echo "Establishing initialization node for annealing simulation (${ANNEALID})."
 	fi
 
@@ -443,7 +475,7 @@ genCHTCanneal() {
 
 	## SCRIPT
 	# if verbose, inform the user
-	if [[ VERB_BOOL -eq 1 ]]; then 
+	if [[ $VERB_BOOL -eq 1 ]]; then 
 		echo "Establishing looping anneal node for annealing simulation (${ANNEALID})."
 	fi
 
@@ -507,7 +539,7 @@ genCHTCanneal_rerun () {
 	CURR_DIR="${CURR_DIR}"
 	# directory corresponding to the previous simulations that should be
 	# loaded for the current iteration of the annealing simulation
-	if [[ RERUN_IT -eq 0 ]]; then
+	if [[ $RERUN_IT -eq 0 ]]; then
 		# if the first iteraction of the annealing simulation is 
 		# being rerun, then the save files in the initial directory
 		# should be rerun
@@ -591,7 +623,7 @@ genCHTCanneal_rerun () {
 
 	## SCRIPT
 	# if verbose, inform the user
-	if [[ VERB_BOOL -eq 1 ]]; then 
+	if [[ $VERB_BOOL -eq 1 ]]; then 
 		echo "Establishing rerun node for iteration number ${CURR_DIR} of annealing simulation ${ANNEALID}."
 	fi
 
@@ -607,9 +639,9 @@ genCHTCanneal_rerun () {
 	echo "transfer_output_remaps = \"${TRANSFER_OUTPUT_REMAPS}\"" >> $SUB_PATH
 	echo "when_to_transfer_output = ON_SUCCESS" >> $SUB_PATH
 	echo "" >> $SUB_PATH
-	echo "log = out/anneal.log" >> $SUB_PATH
-	echo "error = out/anneal.err" >> $SUB_PATH
-	echo "output = out/anneal.out" >> $SUB_PATH
+	echo "log = out/anneal${CURR_DIR}.log" >> $SUB_PATH
+	echo "error = out/anneal${CURR_DIR}.err" >> $SUB_PATH
+	echo "output = out/anneal${CURR_DIR}.out" >> $SUB_PATH
 	echo "" >> $SUB_PATH
 	echo "request_cpus = 1" >> $SUB_PATH
 	echo "request_disk = ${REQUEST_DISK}" >> $SUB_PATH
@@ -646,6 +678,35 @@ clear_temp_dir (){
 	fi
 }
 
+# function that checks to see if a directory exists, or if it contains any files
+gendir () {
+    ## ARGUMENTS
+    # first argument: directory with path to check for
+    local directory=$1
+    
+    ## PARAMETERS
+    # none
+    
+    ## SCRIPT
+    # inform the user
+    if [[ $VERB_BOOL -eq 1 ]]; then
+	    echo "Generating directory ${directory} .. "
+    fi
+    # check to see if the directory exists
+    if test -d $directory; then 
+        # if the directory exists, check to see if it contains any files
+        if [ -n "$(ls -A $directory)" ]; then 
+        	# if the directory contains files or other directories, delete them
+            rm -r ${directory}/*
+        fi
+        # otherwise, if the directory exists but doesn't contain any files
+        # nothing else needs to be done
+    else
+        # if the directory does not exist, make the directory
+        mkdir -p $directory
+    fi
+}
+
 ## OPTIONS
 # parse options
 while getopts "hvosrj:c:e:f:gx:h:p:t" option; do 
@@ -660,7 +721,7 @@ while getopts "hvosrj:c:e:f:gx:h:p:t" option; do
 			# boolean that determines if the script should
 			# overwrite existing simulation data corresponding to job
 			declare -i OVERWRITE_BOOL=0
-			# declare -i OVERWRITE_BOOL=1
+			# declare -i OVERWRITE_BOOL=1 # don't actually do this unless you really mean to
 			;;
 		g) # generate simulation directories / parameters 
 			
@@ -737,23 +798,24 @@ fi
 
 
 ## generate data, if specified
-if [[ GEN_BOOL -eq 1 ]]; then
+if [[ $GEN_BOOL -eq 1 ]]; then
 
 	# TODO :: incorperate dipole into simulation parameters
-	if [[ VERB_BOOL -eq 1 ]]; then 
+	if [[ $VERB_BOOL -eq 1 ]]; then 
 		echo -e "\nconH :: Generating simulation parameters."
 	fi
 	# generate specified simulation parameters
 	./simbin/bash/chtc/conH_simparam.sh -x 50 -r $NUM_REPLICATES $JOB $SIMID
-	./simbin/bash/chtc/conH_simparam.sh -x 75 -r $NUM_REPLICATES $JOB $SIMID
+	# ./simbin/bash/chtc/conH_simparam.sh -x 75 -r $NUM_REPLICATES $JOB $SIMID
 	./simbin/bash/chtc/conH_simparam.sh -x 100 -r $NUM_REPLICATES $JOB $SIMID
+	exit 0
 fi 
 
 # write parameters to file. if the directories already exist,
 # then they should already by in the file
 
 ## start / restart simulations
-if [[ VERB_BOOL -eq 1 ]]; then
+if [[ $VERB_BOOL -eq 1 ]]; then
 	echo -e "\nconH :: Parsing simulation parameters."
 fi
 # load data from csv
@@ -762,7 +824,7 @@ declare -i N_LINES=$(./simbin/bash/util/parse_csv.sh -l -f ${SIMPARAM_FILE})
 # loop through each line in file
 # parse simulation parameters
 declare -i LINE=2 # first line is the header
-while [[ LINE -le N_LINES ]]
+while [[ $LINE -le $N_LINES ]]
 do
 
 	# parse the simulation data
@@ -775,6 +837,12 @@ do
 	XA_VAL="$(echo ${SIMPARM} | cut -d , -f 3 )"
 	H_VAL="$(echo ${SIMPARM} | cut -d , -f 4 )"
 	ETA_VAL="$(echo ${SIMPARM} | cut -d , -f 5 )"
+
+	# if [[ $XA_VAL == "1.00" ]]; then
+	# 	echo $ANNEALID
+	# 	((LINE+=1))
+	# 	continue
+	# fi
 
 	# establish annealing simulation id
 	SUBDAG="${ANNEALID}.spl"
@@ -800,8 +868,8 @@ done
 # exit 0
 
 # submit job to CHTC
-if [[ SUBMIT_BOOL -eq 1 ]]; then
+if [[ $SUBMIT_BOOL -eq 1 ]]; then
 	condor_submit_dag -batch-name "${JOBID}" ${DAG} > ${JOBID}_dagsub.out
 	sleep 10
-	condor_watch_q
+	# condor_watch_q
 fi

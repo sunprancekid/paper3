@@ -25,15 +25,15 @@ declare -i EXEC_CODE=0
 # default job name
 JOB="testH"
 # default model used for simulations
-MODEL="polsqu2x2"
+MODEL="squ2"
 # default cell size of simulation
-declare -i CELL=16
+declare -i CELL=32
 # default simulation area fraction
-declare -i AREA_FRACTION=15
+declare -i AREA_FRACTION=4
 # default area fraction of simulation
 declare -i ETA=20
 # default number of simulation events
-declare -i EVENTS=200000000
+declare -i EVENTS=300000000
 # minimum temperature set point for simulations
 declare -i TEMP_MIN=025
 # maximum temperature set point
@@ -75,8 +75,8 @@ while getopts "ae:gv" options; do
 			declare -i EXEC_CODE=${OPTARG}
 
 			# check that the value passed to the program is within the bounds
-			if [[ EXEC_CODE -lt 0 || EXEC_CODE -gt 2 ]]; then
-				echo -e "Incorrect execution code passed to script."
+			if [[ $EXEC_CODE -lt 0 || $EXEC_CODE -gt 2 ]]; then
+				echo -e "Incorrect execution code passed to script (${EXEC_CODE})."
 				exit $NONZERO_EXITCODE
 			fi
 			;;
@@ -106,7 +106,8 @@ shift $((OPTIND-1))
 
 
 ## ARGUMENTS
-# none
+# first argument: the type of testH simulation to perform
+testH_job="$1"
 
 
 ## FUNCTIONS
@@ -148,7 +149,7 @@ gensim () {
 	# path to main fortran directory
 	FORTRAN_DIR="./simbin/fortran/"
 	# list of fortran files to copy from the simbin
-	FORTRAN_FILES=( "testH.f90" "polsqu2x2_mod.f90" )
+	FORTRAN_FILES=( "testH_${testH_job}.f90" "polsqu2x2_mod.f90" )
 	# path to simulation directory
 	SIM_FORT_DIR="${D}/fortran/"
 	# name of executable for CHTC execute node
@@ -175,7 +176,7 @@ gensim () {
 	for F in ${FORTRAN_FILES[@]}; do
 
 		# inform user
-		if [[ VERB_BOOL -eq 1 ]]; then 
+		if [[ $VERB_BOOL -eq 1 ]]; then 
 			echo "copying ${F} from ${FORTRAN_DIR} to ${SIM_FORT_DIR}."
 		fi
 
@@ -186,9 +187,9 @@ gensim () {
 	# write CHTC executable to the simulation directory
 	echo "#!/bin/bash" > $EXECUTE # shebang!!
 	echo "set -e" >> $EXECUTE # catch errors!!
-	echo "${GFORT} ${GFORT_FLAG} -c polsqu2x2_mod.f90 testH.f90" >> $EXECUTE
-	echo "${GFORT} -o testH.ex testH.o polsqu2x2_mod.o" >> $EXECUTE
-	echo "./testH.ex \$1 \$2 \$3 \$4 \$5 \$6 \$7" >> $EXECUTE
+	echo "${GFORT} ${GFORT_FLAG} -c polsqu2x2_mod.f90 testH_${testH_job}.f90" >> $EXECUTE
+	echo "${GFORT} -o testH_${testH_job}.ex testH_${testH_job}.o polsqu2x2_mod.o" >> $EXECUTE
+	echo "./testH_${testH_job}.ex \$1 \$2 \$3 \$4 \$5 \$6" >> $EXECUTE
 	chmod u+x ${EXECUTE}
 }
 
@@ -199,11 +200,11 @@ genCHTCsub () {
 	# name of simulation files generated with default polsqu module
 	simname="testH\$(simid)"
 	# list of files that are transfered to the execute node
-	local transin="fortran/polsqu2x2_mod.f90, fortran/testH.f90"
+	local transin="fortran/polsqu2x2_mod.f90, fortran/testH_${testH_job}.f90"
 	# list of files that are transfered from the execute node
 	local transout="${simname}.txt, ${simname}_anneal.csv"
 	# list of remap instructions for files transfered from execute node
-	local transoutremap="${simname}.txt=txt/\$(simid)_\$(rp).txt; ${simname}_anneal.csv=anneal/\$(simid)_\$(rp)_anneal.csv"
+	local transoutremap="${simname}.txt=txt/\$(simid).txt; ${simname}_anneal.csv=anneal/\$(simid)_anneal.csv"
 	# name of the CHTC submission file
 	# local sub="${D}/${JOB}.sub"
 
@@ -222,7 +223,9 @@ genCHTCsub () {
 
 	# write submission instructions to submit file
 	echo "executable = ${JOB}.sh" > $sub
-	echo "arguments = \$(area_frac) \$(events) \$(cell) \$(temp) \$(vmag) \$(ffrq) \$(simid)" >> $sub 
+	echo "arguments = \$(area_frac) \$(events) \$(cell) \$(T) \$(X) \$(simid)" >> $sub 
+	echo "" >> $sub
+	echo "+SingularityImage = \"/cvmfs/singularity.opensciencegrid.org/opensciencegrid/osgvo-ubuntu-20.04:latest\"" >> $sub
 	echo "" >> $sub 
 	echo "should_transfer_files = YES" >> $sub
 	echo "transfer_input_files = ${transin}" >> $sub
@@ -247,7 +250,7 @@ genCHTCsub () {
 	echo "requirements = (HAS_GCC == true) && (Mips > 30000)" >> $sub
 	echo "+ProjectName=\"NCSU_Hall\"" >> $sub
 	echo "" >> $sub
-	echo "queue n,simid,rp,area_frac,events,cell,temp,vmag,ffrq from ${SIMPARAM}" >> $sub
+	echo "queue simid,area_frac,cell,events,rp,T,X from ${SIMPARAM}" >> $sub
 }
 
 # function that generates simulation parameters for CHTC simulations
@@ -267,30 +270,42 @@ gensimparam () {
 	# compile flags for script execution
 	local flags=""
 	# execture verbosely
-	if [[ VERB_BOOL -eq 1 ]]; then
+	if [[ $VERB_BOOL -eq 1 ]]; then
 		flags="${flags} -v"
 	fi
 	# path to file and file name
 	flags="${flags} -p ${D}/ -f ${JOB}.csv"
 	# simulation parameters
 	flags="${flags} -c ${CELL} -e ${EVENTS} -a ${AREA_FRACTION}"
+	# testH parameters
+	if [[ "$testH_job" == "TX" ]]; then
+		flags="${flags} -x 500 -i 5 -r ${REPLICATE}"
+	elif [[ "$testH_job" == "TH" ]]; then
+		flags="${flags} -h 800 -i 5 -r ${REPLICATE}"
+	fi
 
-	# call script with flags
-	$SIMP $flags
+	# loop through each temperature
+	declare -i T=20
+	while [[ $T -le 100 ]]; do
+		# call script with flags
+		$SIMP $flags -t $T
+		# increment temperature and repeat
+		((T+=5))
+	done
 }
 
 ## SCRIPT
 ## generate directories
 # zeroth and first directories that store simulation files
 D0="${JOB}"
-D1="${MODEL}_c${CELL}"
-D2="e${ETA}"
+D1="${MODEL}c${CELL}"
+D2="e$(printf '%02d' ${AREA_FRACTION})"
+# generate directories for testH simulations
+D="${D0}/${D1}/${D2}/${testH_job}" # directory containing simulation files
 
 # job id is job name plus model and size of simulation system
-JOBID="${JOB}_${D1}"
+JOBID="${JOB}_${D1}${D2}_${testH_job}"
 
-# generate directories for testH simulations
-D="${D0}/${D1}/${D2}" # directory containing simulation files
 
 # generate DAG file
 DAG="${JOBID}.dag"
@@ -299,7 +314,7 @@ DAG="${JOBID}.dag"
 # 	#rm $DAG
 # fi
 
-if [[ GEN_BOOL -eq 1 ]]
+if [[ $GEN_BOOL -eq 1 ]]
 # if the simulation should be generated on the chtc node
 then
 	# generate directories
@@ -330,5 +345,4 @@ if [[ ANAL_BOOL -eq 1 ]]
 then 
 
 	echo "TODO :: configure testH analysis programs with polsqu simulation code."
-
 fi

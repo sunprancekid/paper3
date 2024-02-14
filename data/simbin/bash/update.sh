@@ -8,8 +8,8 @@ set -e
 
 ## PARAMETERS 
 # login address to access hpc login nodes
-LOGIN="mad@ap21.uc.osg-htc.org"
-# LOGIN="matthew.dorsey@ap1.facility.path-cc.io"
+# LOGIN="mad@ap21.uc.osg-htc.org"
+LOGIN="matthew.dorsey@ap1.facility.path-cc.io"
 # LOGIN="mad@login05.osgconnect.net"
 # location of simulation directory
 LOC="~/paper3/data/"
@@ -96,17 +96,17 @@ shift $((OPTIND-1))
 ## SCRIPT
 
 # determine the operation that should be performed
-if [[ ALL_BOOL -eq 1 ]]; then 
+if [[ $ALL_BOOL -eq 1 ]]; then 
     # sync everything in the specified location (LOC) with the local directory (LOGIN)
 
     rsync -Pavz $LOGIN:$LOC ../
 
-elif [[ BIN_BOOL -eq 1 ]]; then 
+elif [[ $BIN_BOOL -eq 1 ]]; then 
 
     # upload the simbin to the execute node (LOGIN) to the specified location (LOC)
     scp -r simbin $LOGIN:$LOC
 
-elif [[ JOB_BOOL -eq 1 ]]; then 
+elif [[ $JOB_BOOL -eq 1 ]]; then 
 
     # sync the simulation files corresponding to the specified job id (JOB) 
     # located in the specified location (LOC) on the specified execute node (LOGIN)
@@ -116,7 +116,7 @@ elif [[ JOB_BOOL -eq 1 ]]; then
     # echo "TODO upload simupdate program"   
     # ./simbin/java/SimUpdate.sh ${JOB} true
 
-elif [[ SAVE_BOOL -eq 1 ]]; then 
+elif [[ $SAVE_BOOL -eq 1 ]]; then 
     # upload local save files corresponding to the specified job id (JOB) to the location (LOC)
     # on the execute directory (LOGIN)
 
