@@ -49,15 +49,15 @@ declare -i AF=20
 # boolean determining if the temperature has been passed to the method
 declare -i TEMP_BOOL=0
 
-## SIMULATION FIELD STRENGTH
-# boolean determing if simulation field strength was called
-# indicating that TH simulations should be performed
-declare -i FIELD_BOOL=0
-
-## SIMULATION THERMAL TO FIELD STRENGTH (X)
+## SIMULATION MAGNETIC TO THERMAL ENERGY (X)
 # booleaning determing if ratio of thermal to magnetic energy was called
 # indicating the TX simulations should be performed
 declare -i X_BOOL=0
+
+## SIMULATION FIELD STRENGTH (H)
+# boolean determing if simulation field strength was called
+# indicating that TH simulations should be performed
+declare -i H_BOOL=0
 
 ## INCREMENT
 # amount to increment X or H by, which ever is called
@@ -177,6 +177,66 @@ get_simid () {
 
 	# return to user
 	echo $simid
+}
+
+# function that writes simulation parameters 
+# that vary with respect to the external field strength
+# and the system temperature
+genTH () {
+
+	## PARAMETERES
+	# file that contains parameters for TX simulations
+	TH_file=${SIMPARAM_PATH}${SIMPARAM_FILE}
+	# header that is written to file
+	TH_header='id,d,c,e,r,T,H'
+	# formatted density as area fraction
+	DEN=$(printf '%3.2f' $(awk "BEGIN { print $AF / 100 }"))
+	## X parameters- ratio of magnetic to thermal energy
+	# minimum x val
+	declare -i minH_int=0
+	# maximum x val
+	declare -i maxH_int=$MAX_H_VAL
+	# amount to increment x by
+	declare -i incH_int=$INC_INT
+	# string used to format the x int to a double val
+	formX=''
+
+	## ARGUMENTS
+	# none
+
+	## SCRIPT
+	# # determine if the file exists
+	# if ! [ -f $TH_file ]; then
+	# 	# if the file does not exist, write the header to file
+	# 	echo $TH_header > $TH_file
+	# fi
+
+	# loop through variables, write each combination to file
+	declare -i N=0
+	# first variable is x
+	declare -i H=$minH_int
+	while [[ $H -le $maxH_int ]]; do
+		# second variable is replicates
+		declare -i RP=0
+		while [[ $RP -lt $REPLICATES ]]; do
+			# establish the simulation id
+			SIMID=$(get_simid -t $T -h $H -r $RP)
+			# echo $(get_simid -t $T -x $H -r $rp)
+			# get parameters as floating point numbers
+			H_VAL=$(printf '%4.3f' $(awk "BEGIN { print $H / 1000 }"))
+			T_VAL=$(printf '%4.3f' $(awk "BEGIN { print $T / 100 }"))
+			# establish comma seperated list of simulation parameters
+			PARM="$SIMID,$DEN,$CELL,$EVENT,$RP,$T_VAL,$H_VAL"
+			# write the values to file
+			echo $PARM >> $TH_file
+			# increment counter
+			((N+=1))
+			# increment replicates and repeat
+			((RP+=1))
+		done
+		# increment x and repeat 
+		((H+=$incH_int))
+	done
 }
 
 # function that writes simulation parameters for simulations
@@ -339,9 +399,9 @@ while getopts "t:h:x:i:a:c:e:f:p:r:v" options; do
 		h) # simulation field strength
 			# boolean determing that the simulation field strength was specified
 			# incidating that TH simulations should be generated
-			declare -i FIELD_BOOL=1
+			declare -i H_BOOL=1
 			# parse the integer passed to the method
-			declare -i MAX_FIELD_VAL=${OPTARG}
+			declare -i MAX_H_VAL=${OPTARG}
 			;;
 		x) # simulation ratio of temperature to external field strength
 			# boolean determining that the ration of magnetic to thermal energy was specified
@@ -417,5 +477,11 @@ if [[ $VERB_BOOL -eq 1 ]]; then
 fi
 
 # generate testing parameters for constant temperature and magnetic / thermal ration
-genTX
+if [[ $X_BOOL -eq 1 ]]; then
+	genTX
+fi
+
+if [[ $H_BOOL -eq 1 ]]; then 
+	genTH
+fi
 

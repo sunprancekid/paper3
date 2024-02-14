@@ -19,7 +19,7 @@ declare -i FIELD_BOOL=0
 # minimum field strength
 declare -i FIELD_MIN=0
 # maximum field strength
-declare -i FIELD_MAX=40
+declare -i FIELD_MAX=60
 # amount the external field strength is incremented by
 declare -i FIELD_INC=2
 
@@ -294,14 +294,14 @@ gen_conXA () {
 
 				# check if the directory exists
 				if [[ ! -d $SIMDIR ]]; then
-					if [[ VERB_BOOL -eq 1 ]]; then
+					if [[ $VERB_BOOL -eq 1 ]]; then
 						echo "conH_simparam :: Establishing $SIMDIR .."
 					fi
 					# if it does not, initialize the path to the directory
 					mkdir -p $SIMDIR # directories are generated in the conH submssion / analysis script
 				else
 					# if the directory does exist, the parameter should already be stored in the main sim param file
-					if [[ VERB_BOOL -eq 1 ]]; then
+					if [[ $VERB_BOOL -eq 1 ]]; then
 						echo "conH_simparam :: $SIMDIR has already been established .."
 					fi
 				fi

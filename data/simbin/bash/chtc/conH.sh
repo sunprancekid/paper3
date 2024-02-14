@@ -53,9 +53,9 @@ FINAL_ANNEAL_TEMP="0.05"
 # number of replicates to perform per simulation
 declare -i NUM_REPLICATES=1
 # default number of simulation events, unless specified by user
-declare -i EVENTS=200000000
+declare -i EVENTS=250000000
 # default fraction used to decrease simulation temperature
-declare -i FRAC=97
+declare -i FRAC=98
 # TODO :: replicates are not actually implemented
 
 
@@ -121,7 +121,7 @@ gensimdir () {
 
 	## SCRIPT
 	# inform user
-	if [[ VERB_BOOL -eq 1 ]]; then 
+	if [[ $VERB_BOOL -eq 1 ]]; then 
 		echo -e "\nGenerating annealing simulation (${ANNEALID}) in: ${D}"
 	fi
 
@@ -137,16 +137,16 @@ gensimdir () {
 	if [[ -d "${D}/anneal" ]]; then 
 		# if the subdag exists, then the directory has been initialized
 		# check if the directory should be over written
-		if [[ OVERWRITE_BOOL -eq 1 ]]; then 
+		if [[ $OVERWRITE_BOOL -eq 1 ]]; then 
 			declare -i GEN_DIR=1
 			rm -r ${D}/* # empty the directory and restart
 			# inform user 
-			if [[ VERB_BOOL -eq 1 ]]; then
+			if [[ $VERB_BOOL -eq 1 ]]; then
 				echo "Directory already exists. Overwriting .."
 			fi
 		else
 			# inform the user
-			if [[ VERB_BOOL -eq 1 ]]; then
+			if [[ $VERB_BOOL -eq 1 ]]; then
 				echo "Directory already exists."
 			fi
 		fi
@@ -155,7 +155,7 @@ gensimdir () {
 		# then the directory has not been initialized
 		declare	-i GEN_DIR=1
 		# inform the user
-		if [[ VERB_BOOL -eq 1 ]]; then 
+		if [[ $VERB_BOOL -eq 1 ]]; then 
 			echo "Generating directory .."
 		fi
 	fi

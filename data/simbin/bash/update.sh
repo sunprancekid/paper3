@@ -8,8 +8,8 @@ set -e
 
 ## PARAMETERS 
 # login address to access hpc login nodes
-LOGIN="mad@ap21.uc.osg-htc.org"
-# LOGIN="matthew.dorsey@ap1.facility.path-cc.io"
+# LOGIN="mad@ap21.uc.osg-htc.org"
+LOGIN="matthew.dorsey@ap1.facility.path-cc.io"
 # LOGIN="mad@login05.osgconnect.net"
 # location of simulation directory
 LOC="~/paper3/data/"
