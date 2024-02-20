@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import glob
 import matplotlib.pyplot as plt
-import conH_simparam as parm
+# from simparam import conH_simparm as parm
 
 ## PARAMETERS
 # execute script verbosely
@@ -194,46 +194,46 @@ def update_simulation_results(sim_parm):
 	return prop_dict
 
 
-## ARGUMENTS
-# id associated with job
-job = sys.argv[1]
-# id associated with simulation parameters
-sim = sys.argv[2]
-# optional path to csv file containing simulation parameters
-simparm_path = sys.argv[3]
+# ## ARGUMENTS
+# # id associated with job
+# job = sys.argv[1]
+# # id associated with simulation parameters
+# sim = sys.argv[2]
+# # optional path to csv file containing simulation parameters
+# simparm_path = sys.argv[3]
 
 
-## SCRIPT
-## create data frame which stores results for the simulation
+# ## SCRIPT
+# ## create data frame which stores results for the simulation
 
-job_parms = parm.load_conH_parms(simparm_path) # load simulation parameters from file
-df_results = pd.DataFrame() # establish empty data frame that contains the results
-i = 0 # used to count the number of rows in the data frame
+# job_parms = parm.load_conH_parms(simparm_path) # load simulation parameters from file
+# df_results = pd.DataFrame() # establish empty data frame that contains the results
+# i = 0 # used to count the number of rows in the data frame
 
-# loop through parameters, load results
-for p in job_parms:
-	# inform user
-	if verbose:
-		print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
+# # loop through parameters, load results
+# for p in job_parms:
+# 	# inform user
+# 	if verbose:
+# 		print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
 
-	# compile the current results of the simulation, return sim infor
-	prop_dict = update_simulation_results(p)
+# 	# compile the current results of the simulation, return sim infor
+# 	prop_dict = update_simulation_results(p)
 
-	# create dictionary containing simulation parameters, add to dataframe
-	# sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
-	# 	'field': field_val, 'density': density_val}
-	sim_dict = p.info() | prop_dict
-	df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
+# 	# create dictionary containing simulation parameters, add to dataframe
+# 	# sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
+# 	# 	'field': field_val, 'density': density_val}
+# 	sim_dict = p.info() | prop_dict
+# 	df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
 
-	# increment the number of rows in the data frame
-	i += 1
+# 	# increment the number of rows in the data frame
+# 	i += 1
 
-# using the simulation directories, create phase diagrams for the following conditions
+# # using the simulation directories, create phase diagrams for the following conditions
 
 
-# print the results as a csv
-# create summary directories file
-if not os.path.exists(f"{job}/{sim}/summary/"):
-	os.mkdir(f"{job}/{sim}/summary/")
-# write the sim status file to the summary directory
-df_results.to_csv(f"{job}/{sim}/summary/status.csv", index = False)
+# # print the results as a csv
+# # create summary directories file
+# if not os.path.exists(f"{job}/{sim}/summary/"):
+# 	os.mkdir(f"{job}/{sim}/summary/")
+# # write the sim status file to the summary directory
+# df_results.to_csv(f"{job}/{sim}/summary/status.csv", index = False)
