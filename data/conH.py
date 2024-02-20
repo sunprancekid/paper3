@@ -7,8 +7,11 @@
 import sys, os
 from simbin.python.conH.update import update_simulation_results
 import numpy as np
+import pandas as pd
 
 ## PARAMETERS
+# execute script verbosely
+verbose = True
 # file containing simulation parameters
 simparm_file = './conH/squ2c32/conH_squ2c32.csv'
 
@@ -59,13 +62,17 @@ class conH_simparm(object):
 		return vars(self)
 
 ## ARGUMENTS
-# load arguments containing instructions for analysis
+# if update key word is located in script arguments
 update = 'update' in sys.argv
+# if analysis key word is located in script arguments
+anal = 'anal' in sys.argv
 
 ## SCRIPT
 # perform update and analysis
 if update:
-	job_parms = load_conH_parms(simparm_path) # load simulation parameters from file
+	job_parms = load_conH_parms(simparm_file) # load simulation parameters from file
+	## TODO :: pass simulation parameters to method that parses, analyzes data
+	## TODO :: move all of this stuff to method in conH.update
 	df_results = pd.DataFrame() # establish empty data frame that contains the results
 	i = 0 # used to count the number of rows in the data frame
 
@@ -79,8 +86,6 @@ if update:
 		prop_dict = update_simulation_results(p)
 
 		# create dictionary containing simulation parameters, add to dataframe
-		# sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
-		# 	'field': field_val, 'density': density_val}
 		sim_dict = p.info() | prop_dict
 		df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
 
@@ -90,7 +95,13 @@ if update:
 	# using the simulation directories, create phase diagrams for the following conditions
 	# print the results as a csv
 	# create summary directories file
-	if not os.path.exists(f"{job}/{sim}/summary/"):
-		os.mkdir(f"{job}/{sim}/summary/")
+	if not os.path.exists(f"conH/squ2c32/summary/"):
+		os.mkdir(f"conH/squ2c32/summary/")
 	# write the sim status file to the summary directory
-	df_results.to_csv(f"{job}/{sim}/summary/status.csv", index = False)
+	df_results.to_csv(f"conH/squ2c32/summary/status.csv", index = False)
+
+if anal:
+	pass
+	# e.g. load ground state properties (ignore simulation data above certain temp, avg replicates)
+	## TODO :: transition inflection point calculations to CHTC
+	# e.g. parse transition temperatures (calculate if the files do not exist)
