@@ -33,7 +33,7 @@ def calc_ground_state (sim_df):
 
 	# create directory which contains ground state phase diagrams
 	gs_path = anal_dir + "summary/GSPD/"
-	if not os.path.exists(gs_path)
+	if not os.path.exists(gs_path):
 		os.mkdir(gs_path)
 
 
@@ -73,14 +73,26 @@ def calculate_phase_diagrams(anal_dir, sim_df, GSPD = True, AnPD = True):
 		## calculate inflection points for all simulations
 		## calculate annealing phase diagrams
 
+# collect ground state for certain simulation conditions
+# returns data frame containing simulation properties at conditions
+def ground_state_analysis(simparm_df, max_temp = None, xa = None):
+	print(simparm_df)
+	exit()
+	# use simulation parameters to grab ground state
+	if xa is not None:
+		pass
+		# remove simulation parameters from data frame
+		# that do not correspond to constant xa
+
+
 ## ARGUMENTS
 # first argument: path to directory containing simulation files
-anal_dir = sys.argv[1]
+# anal_dir = sys.argv[1]
 
 
-## SCRIPT
-# load data frame which contains the simulation results
-sim_df = pd.read_csv(anal_dir + 'summary/status.csv')
+# ## SCRIPT
+# # load data frame which contains the simulation results
+# sim_df = pd.read_csv(anal_dir + 'summary/status.csv')
 
-# calculate phase diagrams for conH annealing simulations
-calculate_phase_diagrams(anal_dir, sim_df, GSPD = True, AnPD = False)
+# # calculate phase diagrams for conH annealing simulations
+# calculate_phase_diagrams(anal_dir, sim_df, GSPD = True, AnPD = False)

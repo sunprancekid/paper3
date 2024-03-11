@@ -186,6 +186,7 @@ elif [[ $BOOL_ANNEAL -eq 1 ]]; then
 		for f in ${SIM_FILES[@]}; do
 			# copy the file from the temporary directory to
 			# the directory corresponding to the current annealing iteration
+			echo "${CURRENTTIME}: copying ${f} to ./anneal/${NXT_DIR}" >> $ANNEAL_STDOUT
 			cp "${f}" "./anneal/${NXT_DIR}/"
 			# rm "${f}"
 		done

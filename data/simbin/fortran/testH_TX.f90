@@ -47,11 +47,16 @@ program testH
     ! for squares with standard dipoles, degree of charge seperation is one
 
     ! initialize simulation
+    ! TODO :: set property calculation frequency, equilibrium and equilibriation periods
+    ! TODO :: turn off property calculations before equilibriation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
     call set_sphere_movie (status = .false.)
-    call set_square_movie (status = .true., freq = 1000.)
-    call set_thermostat (status = .true., temp = tset, freq = 0.1)
+    call set_square_movie (status = .false.)
+    call set_thermostat (status = .true., temp = tset, freq = 0.2)
     call set_external_field (status = .true., strength = field_strength)
+
+    ! turn on calculating the alignment distribution
+    call alignment_distribution (status = .true., n_bins = 100)
 
     ! initialize system
     call initialize_system(job = "testH", sim = trim(args(6)))

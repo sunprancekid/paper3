@@ -253,6 +253,22 @@ real(kind=dbl) :: squmovfreq = 200.0 ! frequency to take snapshots of movies [re
 real(kind=dbl) :: sphmovfreq = 200.0 ! frequency to take snapshots of sphere movies
 ! TODO :: adjust movie making so that square and sphere movies can happen at different frequencies
 
+! ** alignment distribution **
+! parameters
+integer, parameter :: align_dist_iounuit = 20
+real(kind=dbl), parameter :: min_align_bin = -pi ! minimum value of the distribution function
+real(kind=dbl), parameter :: max_align_bin = pi ! maximum value of the distribution function
+integer, parameter :: default_align_bin = 200 ! default number of bins which describe that angular distribution
+integer, parameter :: max_n_align_bin = 400
+integer, parameter :: min_n_align_bin = 10
+character(len=20), parameter :: default_align_dist_file = 'aligndist.csv'
+logical, parameter :: default_align_dist_equil_status = .true.
+! distribution variables
+logical :: calc_align_dist = .false.
+integer :: n_align_bin ! number of bins used to create angular distribution histogram
+character(len=max_charlength) align_dist_filename ! file name used to save alignment distribution
+logical :: align_dist_equil_status
+integer, dimension(:), allocatable :: alignment_histogram ! histogram containing the distribution of 
 
 
 !*************************************************************
@@ -457,6 +473,20 @@ function single_step () result (stop)
     ! property calculations
     if (mod(n_events, propfreq) == 0) then 
         call calculate_poperties ()
+        ! accumulate alignment distribution
+        if (calc_align_dist) then
+            if (align_dist_equil_status .and. (n_events > event_equilibriate)) then 
+                ! if the distrubution equilibrium status is set to true
+                ! and the system has reached equilibrium, accumulate the distribution
+                call accumulate_alignment_distribution (0)
+                ! write (simiounit,*) 'check, check'
+            else if (.not. align_dist_equil_status) then
+                ! otherwise, the simulation does not need to wait until 
+                ! the system has reached equilibrium to accumulate the alignment distribution
+                call accumulate_alignment_distribution (0)
+            endif
+        endif
+        ! TODO :: add equilbrium averaging here
     end if 
 
     ! report and reset properties to user information
@@ -572,8 +602,8 @@ subroutine initialize_simulation_settings (af, ac, e, nc)
     event_equilibrium = 0.1 * total_events
     event_equilibriate = 0.9 * total_events 
     event_reschedule = 10000 
-    event_average = 1000000
-    propfreq = 1000000 
+    event_average = 10000000
+    propfreq = 1000000
     milestonecheck_freq = 1000 
 
     ! turn on cell + neighbor list
@@ -1124,6 +1154,99 @@ subroutine set_external_field_rotation (rot_status, rot_freq)
         endif
     endif
 end subroutine set_external_field_rotation
+
+subroutine alignment_distribution(status, n_bins, filename, equilibrium)
+    implicit none
+    logical, intent(in), optional :: status 
+    ! status of calculating alignment distribution
+    integer, intent(in), optional :: n_bins
+    ! number of bins in distribution histogram
+    character(len=*), intent(in), optional :: filename 
+    ! name of file to save normalized distribution too
+    logical, intent(in), optional :: equilibrium
+    ! boolean to wait for system to reach equilibrium 
+    ! before starting compiling distribution
+
+    !! FORMATTED WRITE STATEMENTS
+    1 format(" alignment_distribution :: alignment distribution file name set to ", A,".")
+
+    ! assign distribution parameters based on function inputs
+    ! check status
+    if (present(status)) then 
+        if (status) then 
+            ! turn on alignment distribution
+            calc_align_dist = .true.
+            write (*,*) "alignment_distribution :: calculate alignment distribution turned on."
+        else
+            ! turn off alignment distribution
+            calc_align_dist = .false.
+            write (*,*) "alignment_distribution :: calculate alignment distribution turned off."
+        endif 
+    else
+        ! if the distribution status is not passed to the method, 
+        ! the alignment distribution is off
+        calc_align_dist = .false.
+    endif
+
+    if (calc_align_dist) then
+        ! if the alignment distribution is on, check the other properties
+
+        ! check number of bins in distribution histogram
+        if (present(n_bins)) then
+            ! check if the value passed to the method meets the constrains
+            if (n_bins > max_n_align_bin) then
+                ! if the number of bins passed to the method
+                ! is greater than the allowable amount
+                ! assign the maximum allowable number
+                n_align_bin = max_n_align_bin
+            else if (n_bins < min_n_align_bin) then
+                ! if the number of bins passed to the method
+                ! is less than the allowable amount
+                ! assign the minimum number
+                n_align_bin = min_n_align_bin
+            else
+                ! the number is with in the appropriate range
+                n_align_bin = n_bins
+            endif
+        else
+            ! assign the default number
+            n_align_bin = default_align_bin
+        endif
+
+        ! check the filename
+        if (present(filename)) then 
+            ! assign the filename passed to the method alignment file
+            ! TODO :: check that the file has the correct filetype ending
+            ! check the length, assign
+            if (len_trim(filename) <= max_charlength) then 
+                ! if the length is less than the max character length
+                ! assign the job
+                align_dist_filename = trim(filename)
+            else
+                ! if the string is too long 
+                ! inform the user and assign the default
+                write (*,*) "alignment_distribution :: unable to assign filename passed to method. Too many characters in string."
+                align_dist_filename = trim(default_align_dist_file)
+            endif
+        else
+            ! assign the default file name
+            align_dist_filename = trim(default_align_dist_file)
+        endif
+        write (*,1) trim(align_dist_filename)
+
+        ! check the equilibrium conditions
+        if (present(equilibrium)) then 
+            ! assign the equilibrium value
+            align_dist_equil_status = equilibrium
+        else
+            ! assign the default equilibrium status
+            align_dist_equil_status = default_align_dist_equil_status
+        endif
+
+        ! allocate and initialize array!! 
+        allocate(alignment_histogram(n_align_bin))
+    endif
+end subroutine alignment_distribution
 
 ! ** type(id) functions **************************************
 
@@ -2489,6 +2612,13 @@ subroutine close_files ()
     write(mmiounit, *) boundary_index, ',', upper_nematic_boundary, ',', lower_nematic_boundary, ',', &
         n_ul, ',', n_uu, ',', n_lu, ',', n_ll, ',', t_u, ',', t_l 
     close (unit = mmiounit, status = 'KEEP')
+
+    ! write equilbrium distributions to file
+    if (calc_align_dist) then
+        call accumulate_alignment_distribution (1, align_dist_filename, align_dist_iounuit)
+        ! deallocate arrays
+        deallocate(alignment_histogram)
+    endif
 end subroutine close_files
 
 subroutine record_position_circles ()
@@ -2796,6 +2926,11 @@ subroutine initialize_properties ()
     call accumulate_properties (nclust, 0)
     call accumulate_properties (nematic, 0)
     call accumulate_properties (allign, 0)
+
+    ! intialize histogram arrays
+    if (calc_align_dist) then 
+        alignment_histogram = 0
+    endif
 end subroutine initialize_properties
 
 subroutine calculate_poperties()
@@ -3527,6 +3662,97 @@ subroutine calculate_allignment(op)
     ! average and return
     op = op / real(cube)
 end subroutine calculate_allignment
+
+! // alignment distribution //
+
+subroutine accumulate_alignment_distribution(icode, iofile, iounit)
+    implicit none
+    integer, intent(in) :: icode ! defines operation to be performed
+    character(len=max_charlength), intent(in), optional :: iofile
+    integer, intent(in), optional :: iounit
+    real(kind=dbl) :: dist_delta ! width of histogram bins
+    character(len=40) :: distfile 
+    integer :: i, m, q ! indexing
+    real(kind=dbl) :: phi ! orientation of rod relative to the y-axis (assumed direction of field)
+    type(position), dimension(mer) :: rcircles ! position of all disks making the colloid
+    type(position) :: dr ! used as intermediary for angle calculation
+    real(kind=dbl) :: totalarea ! used to count the total number of histogram counts
+
+    ! establish the distribution delta factor
+    dist_delta = (max_align_bin - min_align_bin) / n_align_bin
+
+    ! check operation to be performed
+    if (icode == 0) then 
+        ! accumulate the distribution of allignment with the field
+        ! for each rod
+        do i = 1, cube 
+            ! calculate the allignment of the rod with the field
+            ! initialize the angle of the rod
+            phi = 0.
+            ! calculate the real position of all of the circles from the false position
+            do m = 1, mer 
+                do q = 1, ndim 
+                    rcircles(m)%r(q) = square(i)%circle(m)%fpos%r(q) + square(i)%circle(m)%vel%v(q) * tsl 
+                enddo
+                call apply_periodic_boundaries (rcircles(m))
+            enddo
+
+            ! calculate the angle of the colloid relative to the x-axis
+            phi = 0.
+            do q = 1, ndim 
+                ! the orientation of the square depends on the squares chirality
+                if (square(i)%chai == 1) then
+                    ! if the chirality of the square is A
+                    dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+                else
+                    ! if the chirality of the square is B
+                    dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+                endif
+                if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
+                if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
+                phi = phi + (dr%r(q) ** 2)
+            enddo
+            phi = sqrt(phi) ! distance vector
+            phi = (dr%r(2)) / phi ! normalized y-distance
+            phi = acos(phi) ! bounds [-1, 1], range [0, pi] 
+            if (dr%r(1) > 0.) phi = -phi
+            if (phi < -pi) then
+                phi = phi + twopi
+            elseif (phi > pi) then 
+                phi = phi - twopi
+            endif
+            ! accumulate the alignment in the histogram
+            m = ceiling((phi - min_align_bin) / dist_delta)
+            alignment_histogram(m) = alignment_histogram(m) + 1
+        end do
+    elseif (icode == 1 .and. present(iounit) .and. present(iofile)) then 
+        ! write the histogram out to file
+        ! establish the filename
+        distfile = trim(jobid) // trim(simid) // '_' // trim(iofile)
+        ! open the file to write the information to
+        open (unit = iounit, file = distfile, status = 'REPLACE')
+        ! write header
+        write(iounit,*) 'no,theta,align'
+        ! sum the total number of counts in the histogram
+        totalarea = 0.
+        do i = 1, n_align_bin
+            ! area is hight times width?
+            ! TODO :: should area be calculated in radians times arc length? 
+            ! TODO :: that turns into more of an optimization problem since the radius would be variable
+            !       with respect to the angle
+            totalarea = totalarea + alignment_histogram(i) * dist_delta
+        enddo
+        ! write the normalize histogram count to the file
+        do i = 1, n_align_bin
+            ! histogram(i) = histogram(i) * (normal_frac / (real(i - 0.5) ** 2))
+            write (iounit,501) i, (((real(i) - 0.5) * dist_delta) + min_align_bin), &
+                real(alignment_histogram(i)) / totalarea
+            501 format(I3,',',F8.5,',',F8.5)
+        end do
+        ! close the file
+        close(unit = iounit, status = 'KEEP')
+    endif
+end subroutine accumulate_alignment_distribution
 
 ! ** event scheduling *****************************************
 

@@ -14,8 +14,6 @@ import matplotlib.pyplot as plt
 # from simparam import conH_simparm as parm
 
 ## PARAMETERS
-# execute script verbosely
-verbose = True
 # integer the specifies the number of points contained in a data series plot
 max_ds_points = 10000
 
@@ -82,9 +80,9 @@ def plot_temp_time_series (save_path, time, temp):
 	plt.savefig(save_path, bbox_inches='tight', dpi = 200)
 	plt.close(fig)
 
-# method used to compile results from the simulation, report the current
-# state of the simulation to the user
-def update_simulation_results(sim_parm):
+# method used to compile results from the annealing simulation, 
+# then report the current state of the simulation to the user
+def compile_simulation_results (sim_parm):
 
 	# # parse the simid from the splice file
 	# simid = glob.glob(sim_dir + "*.spl")
@@ -192,3 +190,42 @@ def update_simulation_results(sim_parm):
 	## TODO :: plot properties and fluctuations for all properties (make dict?)
 	## TODO :: return most recent point in data series for sim update file
 	return prop_dict
+
+# method that gets updates from simulations, described by
+# list of simulation parameters passed to method
+def update_simulation_results (simparms, savedir = None, saveas = None, verbose = False):
+
+	df_results = pd.DataFrame() # establish empty data frame that contains the results
+	i = 0 # used to count the number of rows in the data frame
+
+	# loop through parameters, load results
+	for p in simparms:
+		# inform user
+		if verbose:
+			print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
+
+		# compile the current results of the simulation, return sim infor
+		prop_dict = compile_simulation_results (p)
+
+		# create dictionary containing simulation parameters, add to dataframe
+		sim_dict = p.info() | prop_dict
+		df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
+
+		# increment the number of rows in the data frame
+		i += 1
+
+	# if save dir was specified
+	if savedir is not None:
+		# print the results as a csv
+		# create summary directories
+		if not os.path.exists(savedir):
+			os.mkdir(savedir)
+
+		# establish save file
+		if saveas is not None:
+			savefile = savedir + saveas
+		else:
+			savefile = savedir + 'status.csv'
+
+		# write the sim status file to the summary directory
+		df_results.to_csv(savefile, index = False)

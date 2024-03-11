@@ -6,6 +6,9 @@
 ## PACKAGES
 import sys, os
 from simbin.python.conH.update import update_simulation_results
+from simbin.python.conH.anal import ground_state_analysis
+from simbin.python.fig.highlight_plot import gen_highlight_plot
+from simbin.python.fig.distribution_plot import gen_dist_plot
 import numpy as np
 import pandas as pd
 
@@ -66,42 +69,115 @@ class conH_simparm(object):
 update = 'update' in sys.argv
 # if analysis key word is located in script arguments
 anal = 'anal' in sys.argv
+# if distributions key word is located in script arguments
+test_dist = 'test_dist' in sys.argv
 
 ## SCRIPT
 # perform update and analysis
 if update:
 	job_parms = load_conH_parms(simparm_file) # load simulation parameters from file
-	## TODO :: pass simulation parameters to method that parses, analyzes data
-	## TODO :: move all of this stuff to method in conH.update
-	df_results = pd.DataFrame() # establish empty data frame that contains the results
-	i = 0 # used to count the number of rows in the data frame
-
-	# loop through parameters, load results
-	for p in job_parms:
-		# inform user
-		if verbose:
-			print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
-
-		# compile the current results of the simulation, return sim infor
-		prop_dict = update_simulation_results(p)
-
-		# create dictionary containing simulation parameters, add to dataframe
-		sim_dict = p.info() | prop_dict
-		df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
-
-		# increment the number of rows in the data frame
-		i += 1
-
-	# using the simulation directories, create phase diagrams for the following conditions
-	# print the results as a csv
-	# create summary directories file
-	if not os.path.exists(f"conH/squ2c32/summary/"):
-		os.mkdir(f"conH/squ2c32/summary/")
-	# write the sim status file to the summary directory
-	df_results.to_csv(f"conH/squ2c32/summary/status.csv", index = False)
+	update_simulation_results(job_parms, savedir = './conH/squ2c32/summary/', verbose = True)
 
 if anal:
-	pass
+	## BRAIN STORMING
 	# e.g. load ground state properties (ignore simulation data above certain temp, avg replicates)
 	## TODO :: transition inflection point calculations to CHTC
 	# e.g. parse transition temperatures (calculate if the files do not exist)
+
+	# load simulation parameteres
+	# job_parms = load_conH_parms(simparm_file)
+
+	# # load ground state
+	# ground_state_analysis(job_parms, max_temp = 0.6, xa = 0.5)
+
+	# load summary file as df
+	df = pd.read_csv('./conH/squ2c32/summary/status.csv')
+
+	# loop through all items in list
+	# normalize the number of clusters as the average cluster size
+	# for index, row in df.iterrows():
+	# 	df.at[index, 'nclust'] = math.log10(df.at[index, 'nclust'])
+		# df.at[index, 'nclust'] = 1024 / df.at[index, 'nclust']
+		# print(df.at[index, 'nclust'])
+	# exit()
+
+
+	for i in [0.5, 1.0]:
+		# get masked df
+		mask = (df['XA'] == i) & (df['temp'] < 0.6)
+
+		# generate file names
+		save_mag_file = "gs_mag_xa{:03d}".format(int(i * 100))
+		save_clust_file = "gs_clust_xa{:03d}".format(int(i  * 100))
+
+
+		# plot the ground state average cluster size of system against
+		# the external field strength for different densities
+		gen_highlight_plot(
+			df = df[mask],
+			# file = TH_dir + 'anal/testH_anal.csv',
+			y_col = 'nclust',
+			x_col = 'H',
+			iso_col = 'ETA',
+			save = './conH/squ2c32/summary/' + save_clust_file,
+			# iso_vals = [float("{:.2f}".format(x)) for x in np.linspace(0.2, 1.0, 1 * 8 + 1, endpoint = True)],
+			iso_vals = [0.05, 0.15, 0.30, 0.50, 0.55, 0.60],
+			# y_major_ticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0],
+			# y_minor_ticks = [0.1, 0.3, 0.5, 0.7, 0.9],
+			max_y = 300,
+			min_y = 1,
+			highlight = [0.05, 0.15, 0.30, 0.50, 0.55, 0.60],
+			highlight_colormap = 'flare',
+			highlight_label = '$\phi$ = {:.2f}',
+			# highlight_label_order = 'max_value',
+			X_label = 'External Field Strength ($H^{*}_{set}$)',
+			Y_label = 'Number of Clusters')
+
+		# plot the ground state magnetism against the system 
+		# against the external field strength for different densities
+		gen_highlight_plot(
+			df = df[mask],
+			# file = TH_dir + 'anal/testH_anal.csv',
+			y_col = 'mag',
+			x_col = 'H',
+			iso_col = 'ETA',
+			save = './conH/squ2c32/summary/' + save_mag_file,
+			# iso_vals = [float("{:.2f}".format(x)) for x in np.linspace(0.2, 1.0, 1 * 8 + 1, endpoint = True)],
+			iso_vals = [0.05, 0.15, 0.30, 0.50, 0.55, 0.60],
+			y_major_ticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0],
+			y_minor_ticks = [0.1, 0.3, 0.5, 0.7, 0.9],
+			highlight = [0.05, 0.15, 0.30, 0.50, 0.55, 0.60],
+			highlight_colormap = 'flare',
+			highlight_label = '$\phi$ = {:.2f}',
+			# highlight_label_order = 'max_value',
+			X_label = 'External Field Strength ($H^{*}_{set}$)',
+			Y_label = 'System Magnetism ($M$)')
+
+
+if test_dist:
+	# plot visualization as linear distribution
+	gen_dist_plot (file = 't020h980r002_aligndist.csv',
+		x_col = 'theta',
+		y_col = 'align',
+		# circular_bool = True,
+		# figure settings
+		save = 'test_lindist.png',
+		title = '$T_{set}^{*}$ = 0.20, $X_{set}$ = 4.9',
+		Y_label = 'Normalized Probability',
+		X_label = '$\\theta$',
+		min_y = 0.,
+		max_y = 1.0,
+		min_x = -np.pi,
+		max_x = np.pi,
+		bar_color = '#AFE1AF',
+		bar_label = 'Simulation Distribution',
+		# axis ticks and labels
+		x_major_ticks = [float("{:.2f}".format(x)) for x in np.linspace(-np.pi, np.pi, 5, endpoint = True)],
+		x_minor_ticks = [float("{:.2f}".format(x)) for x in np.linspace(-np.pi * 3 / 4, np.pi * 3 / 4, 4, endpoint = True)],
+		x_major_ticks_labels = ['-$\pi$', '-$\pi$ / 2', '0', '$\pi$ / 2', '$\pi$'],
+		y_major_ticks = [float("{:.2f}".format(x)) for x in np.linspace(0., 1., 6, endpoint = True)],
+		y_minor_ticks = [float("{:.2f}".format(x)) for x in np.linspace(0.1, 0.9, 5, endpoint = True)],
+		# add von mises expectation plots
+		plot_expectation = True,
+		X = 4.0,
+		expectation_label = '$f (\\theta, X)$')
