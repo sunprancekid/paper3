@@ -61,8 +61,11 @@ integer, parameter :: debug = 0 ! debugging status: 0 == off, 1 == on, 2 == extr
 
 
 ! ** SIMULATION SETTINGS *************************************
-! boolean and default constants for values used to initia-
-! lize the simulation
+! defaults used to initialize simulation procedures
+logical, parameter :: default_equilibriation_status = .false.
+! def
+! TODO :: add default property frequency
+! TODO :: add default event averaging 
 
 ! ** PARAMETERS **
 ! DENSITY
@@ -338,9 +341,19 @@ end type node
 ! simulation settings
 ! ** debugging status
 ! integer :: debug = default_debug_status
-! ** simulation molecules ************************************ 
-type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
 ! ** simulation parameters ***********************************
+logical :: equilibriation_status = default_equilibriation_status
+! determines if the simulation has been assigned a equilibriation period
+logical :: check_equilibriation_time = .false.
+! determines if a length of time has been specified for the equilibriation period
+real(kind=dbl) :: equilibriation_time 
+! length of equilibriation period in simulation seconds
+logical :: check_equilibriation_events = .false.
+! determines if a number of events has been specified for the equilibriation period
+logical :: calculate_poperties_status = .true.
+! determines if properties should be calculated during simulation
+real(kind=dbl) :: equilibriation_events 
+! length of equilibriation period in simulation collision events
 real(kind=dbl) :: timenow ! current length of simulation 
 real(kind=dbl) :: timeperiod ! current length of period 
 real(kind=dbl) :: ghostrate ! frequency of ghost collision 
@@ -348,6 +361,8 @@ real(kind=dbl) :: tempset = default_temperature ! current system temperature set
 integer :: n_events, n_col, n_ghost, n_thermostat, n_field, n_bond, n_hard, n_well ! event counting
 integer :: ghost ! downlist, uplist, and ghost event participants
 integer :: anneal ! number of times the simulation has reduced the temperature
+! ** simulation molecules ************************************ 
+type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
 ! ** simulation properties ***********************************
 type(property) :: te ! total energy 
 type(property) :: ke ! kinetic energy 
@@ -453,47 +468,33 @@ function single_step () result (stop)
         if (check_boundaries()) call restart ()
     end if 
 
-    ! ! markovian milestoning check
-    ! if (mod(n_events, milestonecheck_freq) == 0) then 
-    !     ! determine if simulation has reach any of the cell boundaries
-    !     if (check_milestoning_boundaries ()) then 
-
-    !         ! apply the procedure for reversing a collision with a cell boundary
-    !         call milestone_boundary_collision() 
-    !         call close_files()
-    !         call exit()
-    !     endif
-
-    !     ! if the simulation hasn't reached a bonudary
-    !     ! save the state of the simulation and continue 
-    !     call save()
-
-    ! end if
-
-    ! property calculations
-    if (mod(n_events, propfreq) == 0) then 
-        call calculate_poperties ()
-        ! accumulate alignment distribution
-        if (calc_align_dist) then
-            if (align_dist_equil_status .and. (n_events > event_equilibriate)) then 
-                ! if the distrubution equilibrium status is set to true
-                ! and the system has reached equilibrium, accumulate the distribution
-                call accumulate_alignment_distribution (0)
-                ! write (simiounit,*) 'check, check'
-            else if (.not. align_dist_equil_status) then
-                ! otherwise, the simulation does not need to wait until 
-                ! the system has reached equilibrium to accumulate the alignment distribution
-                call accumulate_alignment_distribution (0)
+    ! TODO :: if property calculation status is true
+    if (calculate_poperties_status) then
+        ! accumulate properties
+        if (mod(n_events, propfreq) == 0) then 
+            ! TODO :: change to accumulate properties
+            call calculate_poperties ()
+            ! TODO :: move alignment distribution to accumulate properties method
+            ! accumulate alignment distribution
+            if (calc_align_dist) then
+                if (align_dist_equil_status .and. (n_events > event_equilibriate)) then 
+                    ! if the distrubution equilibrium status is set to true
+                    ! and the system has reached equilibrium, accumulate the distribution
+                    call accumulate_alignment_distribution (0)
+                else if (.not. align_dist_equil_status) then
+                    ! otherwise, the simulation does not need to wait until 
+                    ! the system has reached equilibrium to accumulate the alignment distribution
+                    call accumulate_alignment_distribution (0)
+                endif
             endif
-        endif
-        ! TODO :: add equilbrium averaging here
-    end if 
+        end if 
 
-    ! report and reset properties to user information
-    if ((mod(n_events, event_average) == 0) .and. (n_events /= 0)) then 
-        call report_properties ()
-        call save()
-    end if 
+        ! average properties, report to user 
+        if ((mod(n_events, event_average) == 0) .and. (n_events /= 0)) then 
+            call report_properties ()
+            call save()
+        end if 
+    endif
 
     ! take snap shot for movie generation as spheres
     if (((moviesph == 1) .or. (moviesqu == 1)) .and. (real(movno) < (timenow / squmovfreq))) then 
@@ -501,6 +502,9 @@ function single_step () result (stop)
         if (moviesqu == 1) call record_position_squares ()
         movno = movno + 1
     end if
+
+    ! TODO :: CHECK EQUILBRIATION STATUS
+    ! TODO :: CHECK SIMULATION END STATUS
 
     ! TODO convert end of simulation calculation to mod function
     if (mod(n_events,total_events) == 0) then
@@ -618,6 +622,118 @@ subroutine initialize_cell_neighbor_list()
     nCells = floor (region / nbrRadius) ! number of cells in one dimension, cell length cannot be shorter than the nerighbor radius
     lengthCell = region / real (nCells) ! legnth of each cell in one dimension, must be greater than the square well length (sig2)
 end subroutine initialize_cell_neighbor_list
+
+! method for determining the equilibriation time period
+! and if properties should be calculated during that time period
+subroutine set_equilibriation (equil_status, equil_time, equil_events, prop_calc_status)
+    implicit none
+    logical, intent(in), optional :: equil_status
+    ! boolean determining if the simulation should be assigned an equilibriation period
+    real, intent(in), optional :: equil_time
+    ! simulation time before system is considered at equilibrium
+    real, intent(in), optional :: equil_events
+    ! number of collision events before simulation is considered at equilibrium
+    logical, intent(in), optional :: prop_calc_status
+    ! boolean that determines if properties should be calculated
+    ! during the equilibriation period
+
+    ! formatted write statements
+    1 format(" set_equilibriation :: Negative time passed to method (", F9.2,"). Unable to assigned equilibriation time.")
+    2 format(" set_equilibriation :: Negative events passed to method (", I13,"). Unable to assigned equilibriation events.")
+    3 format(" set_equilibriation :: Unable to turn on equilibriation period. Must specify equilibriation period (time or events).")
+    4 format(" set_equilibriation :: Simulation equilibriation period turned off.")
+    5 format(" set_equilibriation :: Simulation equilibriation period turned on.")
+    6 format(" set_equilibriation :: Equilibriation period set to ", F9.2," simulation seconds.")
+    7 format(" set_equilibriation :: Equilibriation period set to ", I13," million simulation events.")
+    8 format(" set_equilibriation :: Properties will be calculated during the equilibriation period.")
+    9 format(" set_equilibriation :: Properties will not be calculated during the equilibriation period.")
+
+    ! check if an equilibriuation status was passed to the method
+    if (present(equil_status)) then 
+        ! assign the equilbriation status
+        equilibriation_status = equil_status
+    else
+        ! assign the default
+        equilibriation_status = default_equilibriation_status
+    endif
+
+    ! if the simulation has been assigned an equilibriation period
+    if (equilibriation_status) then
+        ! check if a length of time of number of events were passed to the method
+        if (present(equil_time)) then 
+            ! check that the length of time meets the requirements
+            if (equil_time > 0.) then 
+                ! if the length of time passed to the method is greater than zero
+                ! turn on check for equilibriation time
+                check_equilibriation_time = .true.
+                ! assign the equilibriation period in simulation seconds
+                equilibriation_time = equil_time
+            else
+                ! the value passed to the method is invalid
+                write (*,1) equil_time
+            endif
+        endif
+
+        if (present(equil_events))
+            ! check that the number of events meet the requirements
+            if (equil_events > 0) then
+                ! if the number of events passed to the method is greater than zero
+                ! turn on the check for equilibriation events
+                check_equilibriation_events = .true.
+                ! assign the equilibriation period in simulation collision events
+                equilibriation_events = equil_events
+            else
+                ! the value passed to the method is invalid
+                write (*,2) equil_events
+            endif
+        endif
+
+        if (check_equilibriation_time .and. check_equilibriation_events) then
+            ! neither a number of events or a length of time have been specified
+            ! then eqilibriation period has nothing to check for
+            ! turn off the equilibriation period
+            equilibriation_status = .false.
+            write (*,3)
+            write (*,4)
+        else
+            ! inform the user that the method has been turned on,
+            ! and the simulation properties that will be checked for
+            write (*,5)
+            ! inform the user of the assigned time
+            if (check_equilibriation_time) then
+                write (*,6) equilibriation_time
+            endif
+            ! inform the user of the assigned number of events
+            if (check_equilibriation_events) then
+                write (*,7) equilibriation_events
+            endif
+        end if
+
+        ! if the equilibriation status is still on
+        if (equilibriation_status) then 
+            ! check if the property calculation status was passed to the method
+            if (present(prop_calc_status)) then 
+                ! assign the property calculation status
+                calculate_poperties_status = prop_calc_status
+            endif 
+            ! report to user
+            if (calculate_poperties_status) then
+                ! inform the user that properties will be calculated
+                write (*,8)
+            else
+                ! inform the user that properties will not be calculated
+                write (*,9)
+            endif
+        endif
+    endif
+end subroutine set_equilibriation
+
+subroutine set_property_calculations (avg_evnt, prop_calc_freq)
+    implicit none
+    ! assign the number of events that the system should be considered at equilibrium
+    ! assign the number of events for property averaging and property calculations
+    ! determing if properties should be calculated before equilibrium
+end subroutine
 
 function set_areafraction(val) result (success)
     implicit none
