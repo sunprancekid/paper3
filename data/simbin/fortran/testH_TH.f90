@@ -48,6 +48,10 @@ program testH
 
     ! initialize simulation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
+    ! turn off property calculations during simulation equilibriation period
+    call set_equilibriation (equil_status = .true., equil_events = (events - 20e6), prop_calc_status = .false.)
+    ! assign property calculation frequency
+    call set_property_calculations (propfreq = 100000, eventavg = 10000000)
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .false., freq = 1000.)
     call set_thermostat (status = .true., temp = tset, freq = 0.2)

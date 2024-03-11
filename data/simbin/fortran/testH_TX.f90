@@ -15,6 +15,8 @@ program testH
     integer :: events ! length of simulation
     integer :: cell_size ! simulation cell size
     real :: tset, X, field_strength ! testH parameters
+    integer :: rate
+    integer :: start_time, end_time
 
     ! parse the number of arguments passed to the program
     a = command_argument_count()
@@ -33,6 +35,9 @@ program testH
         call get_command_argument(a,args(a))
     enddo
 
+    call system_clock (count_rate=rate)
+    call system_clock (count=start_time)
+
     ! read argument values
     read (args(1), '(f6.4)') area_frac ! first argument is the simulation area fraction
     read (args(2), *) events ! second argument is the number of simulation events
@@ -47,15 +52,19 @@ program testH
     ! for squares with standard dipoles, degree of charge seperation is one
 
     ! initialize simulation
-    ! TODO :: set property calculation frequency, equilibrium and equilibriation periods
-    ! TODO :: turn off property calculations before equilibriation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = 1.0)
+    ! turn off property calculations during simulation equilibriation period
+    call set_equilibriation (equil_status = .true., equil_events = (events - int(20e6)), prop_calc_status = .false.)
+    ! assign property calculation frequency
+    call set_property_calculations (propfreq = 100000, eventavg = 10000000)
+    ! turn off movies
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .false.)
+    ! assign thermostat temperature and field strength
     call set_thermostat (status = .true., temp = tset, freq = 0.2)
     call set_external_field (status = .true., strength = field_strength)
 
-    ! turn on calculating the alignment distribution
+    ! turn on calculation of the alignment distribution
     call alignment_distribution (status = .true., n_bins = 100)
 
     ! initialize system
@@ -65,6 +74,9 @@ program testH
     do
         if (single_step()) exit
     enddo
+
+    call system_clock (count=end_time)
+    write (*, *) (end_time-start_time)/real(rate), " seconds"
 end program testH
 
 
