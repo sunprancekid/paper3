@@ -107,7 +107,7 @@ def get_highlights (hvals, max_hvals, scale_constant, colormap, label_order, act
 		# get the colormap
 		if colormap in matplotlib.colormaps:
 			cmap = matplotlib.colormaps[colormap]
-			cmap_vals = np.linspace(0.2,1.00,len(hvals), endpoint = True)
+			cmap_vals = np.linspace(0.5,1.00,len(hvals), endpoint = True)
 			colormap = []
 			for i in cmap_vals:
 				colormap.append(cmap(i))
@@ -160,7 +160,7 @@ def get_highlights (hvals, max_hvals, scale_constant, colormap, label_order, act
 			max_hvals[ol[i]] = label_start - (float(i) * label_length)
 
 		# check if order labels are overlapping
-		label_length = max(max_hvals) / (scale_constant * 0.7)
+		label_length = max(max_hvals) / (scale_constant * 0.5)
 		for i in range(len(max_hvals)):
 			if i == 0:
 				# skip the first entry
@@ -215,7 +215,7 @@ def gen_highlight_plot(
 	default_fig_subtitle = ''
 	default_fig_colormap = 'flare'
 	default_fig_colorbar = None
-	default_fig_fontsize = 14
+	default_fig_fontsize = 16
 	default_highlight_label = "{:.2f}"
 	default_highlight_label_order = 'height'
 	default_dpi = 200
@@ -363,7 +363,7 @@ def gen_highlight_plot(
 	if plot_expectation:
 		# TODO how to avoid hard coding this
 		# get all of the expectation values for all unique X
-		X = df[x_col].unique().tolist()
+		X = df[x_col].sort_values(ascending = True).unique().tolist()
 		M = get_magnetic_expectation(X)
 		# plot the line
 		ax.plot(X, M, '--', color='black', lw=2)
@@ -388,7 +388,7 @@ def gen_highlight_plot(
 		ax.text(
 			x_end, 
 			y_end, 
-			'$ M_{{expect}}$', 
+			'$ M_{{expected}}$', 
 			color='black', 
 			fontsize=fontsize, 
 			weight="bold", 

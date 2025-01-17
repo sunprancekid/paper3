@@ -48,7 +48,7 @@ program testH
 
     ! use the temperature set point and ratio of magnetic to thermal energy to
     ! calculate the external field strength
-    field_strength = X * tset / 1.0
+    field_strength = X * tset / (1.0 + 2 * delta)
     ! for squares with standard dipoles, degree of charge seperation is one
 
     ! initialize simulation
@@ -61,7 +61,7 @@ program testH
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .false.)
     ! assign thermostat temperature and field strength
-    call set_thermostat (status = .true., temp = tset, freq = 0.2)
+    call set_thermostat (status = .true., temp = tset, freq = 0.03)
     call set_external_field (status = .true., strength = field_strength)
 
     ! turn on calculation of the alignment distribution

@@ -19,7 +19,7 @@ declare -i FIELD_BOOL=0
 # minimum field strength
 declare -i FIELD_MIN=0
 # maximum field strength
-declare -i FIELD_MAX=60
+declare -i FIELD_MAX=80
 # amount the external field strength is incremented by
 declare -i FIELD_INC=2
 

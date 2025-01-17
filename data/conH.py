@@ -7,6 +7,7 @@
 import sys, os
 from simbin.python.conH.update import update_simulation_results
 from simbin.python.conH.anal import ground_state_analysis
+from simbin.python.conH.anal import ground_state_magnetic_distribution
 from simbin.python.fig.highlight_plot import gen_highlight_plot
 from simbin.python.fig.distribution_plot import gen_dist_plot
 import numpy as np
@@ -73,9 +74,11 @@ anal = 'anal' in sys.argv
 test_dist = 'test_dist' in sys.argv
 
 ## SCRIPT
+# load the job parameters
+job_parms = load_conH_parms(simparm_file) # load simulation parameters from file
+
 # perform update and analysis
 if update:
-	job_parms = load_conH_parms(simparm_file) # load simulation parameters from file
 	update_simulation_results(job_parms, savedir = './conH/squ2c32/summary/', verbose = True)
 
 if anal:
@@ -155,29 +158,8 @@ if anal:
 
 
 if test_dist:
-	# plot visualization as linear distribution
-	gen_dist_plot (file = 't020h980r002_aligndist.csv',
-		x_col = 'theta',
-		y_col = 'align',
-		# circular_bool = True,
-		# figure settings
-		save = 'test_lindist.png',
-		title = '$T_{set}^{*}$ = 0.20, $X_{set}$ = 4.9',
-		Y_label = 'Normalized Probability',
-		X_label = '$\\theta$',
-		min_y = 0.,
-		max_y = 1.0,
-		min_x = -np.pi,
-		max_x = np.pi,
-		bar_color = '#AFE1AF',
-		bar_label = 'Simulation Distribution',
-		# axis ticks and labels
-		x_major_ticks = [float("{:.2f}".format(x)) for x in np.linspace(-np.pi, np.pi, 5, endpoint = True)],
-		x_minor_ticks = [float("{:.2f}".format(x)) for x in np.linspace(-np.pi * 3 / 4, np.pi * 3 / 4, 4, endpoint = True)],
-		x_major_ticks_labels = ['-$\pi$', '-$\pi$ / 2', '0', '$\pi$ / 2', '$\pi$'],
-		y_major_ticks = [float("{:.2f}".format(x)) for x in np.linspace(0., 1., 6, endpoint = True)],
-		y_minor_ticks = [float("{:.2f}".format(x)) for x in np.linspace(0.1, 0.9, 5, endpoint = True)],
-		# add von mises expectation plots
-		plot_expectation = True,
-		X = 4.0,
-		expectation_label = '$f (\\theta, X)$')
+	# get ground state distributions
+	for x in [0.5, 1.0]:
+		for h in [0.0, 0.2, 0.4]:
+			for d in [0.15, 0.30, 0.45]:
+				ground_state_magnetic_distribution(job_parms, XA = x, H = h, ETA = d, save_dir = './conH/squ2c32/summary/')

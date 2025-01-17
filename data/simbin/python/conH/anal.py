@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import glob
 import matplotlib.pyplot as plt
+from simbin.python.fig.distribution_plot import gen_dist_plot
 
 
 ## PARAMETERS
@@ -83,6 +84,53 @@ def ground_state_analysis(simparm_df, max_temp = None, xa = None):
 		pass
 		# remove simulation parameters from data frame
 		# that do not correspond to constant xa
+
+def ground_state_magnetic_distribution (simparm, XA, H, ETA, RP = 0, show = True, save_dir = None, expectation = False):
+
+	if save_dir is None:
+		save_dir = ""
+
+	# get the simulation parameters that match the constraints passed to the method
+	for p in simparm:
+		if p.XA == XA and p.H == H and p.ETA == ETA and p.RP == RP:
+			# for the simulation that meets the constrains
+			# load the analysis file
+			anal_file = p.path + "/anal/" + p.jobid + p.simid + "_sum.csv"
+			df = pd.read_csv(anal_file)
+			# get the integer corresponding to the lowest temperature
+			ann_id = "{:03d}".format(df['id'].max())
+			# create the distirbution file
+			dist_file = p.path + "/anneal/" + ann_id + "/" + p.jobid + p.simid + "_aligndist.csv"
+			# determine the relevant quantities from the file name, labels, etc.
+			temp = df.iloc[int(ann_id)]['temp']
+			X = H / temp
+			# create the distribution plot, save
+			gen_dist_plot (file = dist_file,
+				x_col = 'theta',
+				y_col = 'align',
+				# circular_bool = True,
+				# figure settings
+				save = save_dir + p.simid + '_GSaligndist.png',
+				title = "Ground State Angular Distribution",
+				subtitle = '$x_{{a}}$ = {:.2f}, $H^{{*}}$ = {:.2f}, $\phi$ = {:.2f}, $T^{{*}}$ = {:.2f}'.format(XA, H, ETA, temp),
+				Y_label = 'Normalized Probability',
+				X_label = '$\\theta$',
+				min_y = 0.,
+				max_y = 1.0,
+				min_x = -np.pi,
+				max_x = np.pi,
+				bar_color = '#AFE1AF',
+				bar_label = 'Simulation Distribution',
+				# axis ticks and labels
+				x_major_ticks = [float("{:.2f}".format(x)) for x in np.linspace(-np.pi, np.pi, 5, endpoint = True)],
+				x_minor_ticks = [float("{:.2f}".format(x)) for x in np.linspace(-np.pi * 3 / 4, np.pi * 3 / 4, 4, endpoint = True)],
+				x_major_ticks_labels = ['-$\pi$', '-$\pi$ / 2', '0', '$\pi$ / 2', '$\pi$'],
+				y_major_ticks = [float("{:.2f}".format(x)) for x in np.linspace(0., 1., 6, endpoint = True)],
+				y_minor_ticks = [float("{:.2f}".format(x)) for x in np.linspace(0.1, 0.9, 5, endpoint = True)],
+				# add von mises expectation plots
+				plot_expectation = expectation,
+				X = X,
+				expectation_label = '$f (\\theta, X)$')
 
 
 ## ARGUMENTS

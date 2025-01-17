@@ -53,7 +53,7 @@ FINAL_ANNEAL_TEMP="0.05"
 # number of replicates to perform per simulation
 declare -i NUM_REPLICATES=1
 # default number of simulation events, unless specified by user
-declare -i EVENTS=250000000
+declare -i EVENTS=300000000
 # default fraction used to decrease simulation temperature
 declare -i FRAC=98
 # TODO :: replicates are not actually implemented

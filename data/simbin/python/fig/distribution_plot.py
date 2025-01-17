@@ -103,6 +103,8 @@ def gen_dist_plot(file = None, x_col = None, y_col = None,
 		min_y = min(y_dist)
 	if max_y is None:
 		max_y = max(y_dist)
+	elif max_y < max(y_dist):
+		max_y = max(y_dist)
 
 	# plot linear distribution
 	if not circular_bool:
@@ -110,7 +112,7 @@ def gen_dist_plot(file = None, x_col = None, y_col = None,
 		ax.spines[['right', 'top']].set_visible(False)
 		ax.set_xlim(min_x, max_x)
 		ax.set_ylim(min_y, max_y)
-		if plot_expectation is not None and X is not None:
+		if plot_expectation and X is not None:
 			# establish the relative strength and orientation of the external field
 			loc = 0.0 * np.pi  # HARD CODE: circular mean, direction of field
 			if X <= 0.:
@@ -125,6 +127,8 @@ def gen_dist_plot(file = None, x_col = None, y_col = None,
 		bar_width = ((max(x_dist) - min(x_dist)) / n_bins) * 0.8
 		ax.bar(x_dist, y_dist, facecolor = bar_color, edgecolor="black", \
 			alpha=0.8, width = bar_width, label = bar_label) #, label = left_bar_label
+		ax.tick_params(axis='both', which='major', labelsize=fontsize - 2) 
+		ax.tick_params(axis='both', which='minor', labelsize=fontsize - 2) 
 		# add ticks, if specified
 		if x_major_ticks is not None:
 			ax.set_xticks(x_major_ticks, minor=False)
@@ -168,6 +172,6 @@ def gen_dist_plot(file = None, x_col = None, y_col = None,
 		plt.title(subtitle, fontsize = fontsize)
 	if title is not None:
 		plt.suptitle(title, fontsize = fontsize)
-	ax.legend()
+	ax.legend(prop={'size': fontsize * 0.75})
 	plt.savefig(save, dpi = 600, bbox_inches="tight") 
 	plt.show()

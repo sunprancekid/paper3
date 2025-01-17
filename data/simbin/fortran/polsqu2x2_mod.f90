@@ -624,7 +624,7 @@ subroutine initialize_simulation_settings (af, ac, e, nc)
     na = cube * xa ! number of a chirality cubes 
     area = (excluded_area * cube) / eta ! area of simulation box
     region = sqrt (area) ! length of simulation box wall
-    density = real(cube) / area ! number density of cubes
+    density = real(cube) * real(mer) / area ! number density of spheres
 
     ! parameters for running simulation
     ! TODO :: set_property frequency
@@ -802,7 +802,7 @@ subroutine set_property_calculations (propfreq, eventavg)
     write (*,4) real(event_average)/1e6
 
     ! TODO :: add routines for turning certain property calculations on or off
-end subroutine
+end subroutine set_property_calculations
 
 function set_areafraction(val) result (success)
     implicit none
@@ -2879,12 +2879,12 @@ subroutine record_position_squares ()
     character(len=15), parameter :: A = green
     character(len=15), parameter :: B = orange
     integer :: i, m, q ! indexing parameters
-    character(len=20) :: num, format, string, charge, typenum, typecol, qxy, qzw
+    character(len=20) :: num, format, string, charge, typenum, typecol, qxy, qzw, mag
 
     format = "(2(' ', F7.3))"
 
     write(coorsquiounit,*) cube
-    write(coorsquiounit,*) ' position (xy), orientation (xyzw), particle type, chiralcolor (RBG) ' ! comment line frame number starting from 1
+    write(coorsquiounit,*) ' position (xy), orientation (xyzw), particle type, chiralcolor (RBG), mag ' ! comment line frame number starting from 1
     do i = 1, cube
         ! calculate the real position of all circles
         do m = 1, mer
@@ -2963,12 +2963,33 @@ subroutine record_position_squares ()
         ! calculate the center of the square particle based on the position of the first particle
         rsquare%r(1) = rcircles(1)%r(1) + (sqrt(2.) / 2.) * cos((5. * pi / 4.) + phi)
         rsquare%r(2) = rcircles(1)%r(2) + (sqrt(2.) / 2.) * sin((5. * pi / 4.) + phi)
+
+        ! calculate the alignment of the particle with the field
+        phi = 0.
+        do q = 1, ndim 
+            ! the orientation of the square depends on the squares chirality
+            if (square(i)%chai == 1) then
+                ! if the chirality of the square is A
+                dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            else
+                ! if the chirality of the square is B
+                dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+            endif
+            if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
+            if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
+            phi = phi + (dr%r(q) ** 2)
+        enddo
+        phi = sqrt(phi) ! distance vector
+        phi = (dr%r(2)) / phi ! normalized y-distance
+        !! NOTE :: assumes field direction
+        
         ! apply preiodic boundary conditions
         call apply_periodic_boundaries (rsquare)
         write(string, format) rsquare%r(1), rsquare%r(2)
+        write(mag, '(" ", F7.3)') phi
 
         ! report the description
-        write(coorsquiounit, *) trim(num), trim(string), trim(qxy), trim(qzw), trim(typenum), trim(typecol)
+        write(coorsquiounit, *) trim(num), trim(string), trim(qxy), trim(qzw), trim(typenum), trim(typecol), trim(mag)
     end do 
 end subroutine record_position_squares
 
