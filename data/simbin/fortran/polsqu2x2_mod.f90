@@ -61,8 +61,21 @@ integer, parameter :: debug = 0 ! debugging status: 0 == off, 1 == on, 2 == extr
 
 
 ! ** SIMULATION SETTINGS *************************************
-! boolean and default constants for values used to initia-
-! lize the simulation
+!! defaults used to initialize simulation procedures
+logical, parameter :: default_equilibrium_status = .true.
+! determines if simulation has reached equilibrium (assumed true, unless otherwise specified)
+logical, parameter :: default_equilibriation_status = .false.
+! default equilibrium status, simulation is assumed at equilibrium (false) unless specified (true)
+logical, parameter :: default_property_calculation_status = .true.
+! default frequency in number of events for calculating properties
+integer, parameter :: default_property_calculation_frequency = 100000
+! default property calculation status, property calculation is automatically turned on
+integer, parameter :: default_event_average = 10e6
+! default frequency that events are averaged
+integer, parameter :: default_event_reschedule = 10000
+! default number of events after which all events are rescheduled
+! TODO :: add default property frequency
+! TODO :: add default event averaging 
 
 ! ** PARAMETERS **
 ! DENSITY
@@ -121,11 +134,6 @@ integer :: na, nb ! number of a-chirality, b-chirality squares
 real(kind=dbl) :: region ! length of simulation box in each dimension
 real(kind=dbl) :: area ! area of simulation box 
 real(kind=dbl) :: density ! number density of particles
-integer :: event_equilibrium ! length of simulation after equilibriation
-integer :: event_equilibriate ! length of simulation before equilibriation
-integer :: event_reschedule ! events between complete event rescheduling
-integer :: event_average ! events between property averaging
-integer :: propfreq ! frequency of property calculations
 integer :: milestonecheck_freq ! frequency to check milestoning properties
 
 
@@ -253,6 +261,22 @@ real(kind=dbl) :: squmovfreq = 200.0 ! frequency to take snapshots of movies [re
 real(kind=dbl) :: sphmovfreq = 200.0 ! frequency to take snapshots of sphere movies
 ! TODO :: adjust movie making so that square and sphere movies can happen at different frequencies
 
+! ** alignment distribution **
+! parameters
+integer, parameter :: align_dist_iounuit = 20
+real(kind=dbl), parameter :: min_align_bin = -pi ! minimum value of the distribution function
+real(kind=dbl), parameter :: max_align_bin = pi ! maximum value of the distribution function
+integer, parameter :: default_align_bin = 200 ! default number of bins which describe that angular distribution
+integer, parameter :: max_n_align_bin = 400
+integer, parameter :: min_n_align_bin = 10
+character(len=20), parameter :: default_align_dist_file = 'aligndist.csv'
+logical, parameter :: default_align_dist_equil_status = .true.
+! distribution variables
+logical :: calc_align_dist = .false.
+integer :: n_align_bin ! number of bins used to create angular distribution histogram
+character(len=max_charlength) align_dist_filename ! file name used to save alignment distribution
+logical :: align_dist_equil_status
+integer, dimension(:), allocatable :: alignment_histogram ! histogram containing the distribution of 
 
 
 !*************************************************************
@@ -322,9 +346,27 @@ end type node
 ! simulation settings
 ! ** debugging status
 ! integer :: debug = default_debug_status
-! ** simulation molecules ************************************ 
-type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
 ! ** simulation parameters ***********************************
+logical :: equilibrium_status = default_equilibrium_status
+! determines if the simulation has reached equilibrium yet
+logical :: equilibriation_status = default_equilibriation_status
+! determines if the simulation has been assigned a equilibriation period
+logical :: check_equilibriation_time = .false.
+! determines if a length of time has been specified for the equilibriation period
+real(kind=dbl) :: equilibriation_time 
+! length of equilibriation period in simulation seconds
+logical :: check_equilibriation_events = .false.
+! determines if a number of events has been specified for the equilibriation period
+real(kind=dbl) :: equilibriation_events 
+! length of equilibriation period in simulation collision events
+logical :: calculate_properties_status = default_property_calculation_status
+! determines if properties should be calculated during simulation
+integer :: property_calculation_frequency = default_property_calculation_frequency 
+! frequency of property calculations
+integer :: event_average = default_event_average
+! frequency property calculations are averaged and reported
+integer :: event_reschedule = default_event_reschedule
+! events between complete event rescheduling
 real(kind=dbl) :: timenow ! current length of simulation 
 real(kind=dbl) :: timeperiod ! current length of period 
 real(kind=dbl) :: ghostrate ! frequency of ghost collision 
@@ -332,6 +374,8 @@ real(kind=dbl) :: tempset = default_temperature ! current system temperature set
 integer :: n_events, n_col, n_ghost, n_thermostat, n_field, n_bond, n_hard, n_well ! event counting
 integer :: ghost ! downlist, uplist, and ghost event participants
 integer :: anneal ! number of times the simulation has reduced the temperature
+! ** simulation molecules ************************************ 
+type(group), dimension(:), allocatable :: square ! square groupings plus ghost event
 ! ** simulation properties ***********************************
 type(property) :: te ! total energy 
 type(property) :: ke ! kinetic energy 
@@ -437,33 +481,21 @@ function single_step () result (stop)
         if (check_boundaries()) call restart ()
     end if 
 
-    ! ! markovian milestoning check
-    ! if (mod(n_events, milestonecheck_freq) == 0) then 
-    !     ! determine if simulation has reach any of the cell boundaries
-    !     if (check_milestoning_boundaries ()) then 
+    ! if property calculation status is turned on
+    if (calculate_properties_status) then
+        ! accumulate properties
+        if (mod(n_events, property_calculation_frequency) == 0) then 
+            ! TODO :: change to accumulate properties
+            call calculate_poperties ()
+        end if 
 
-    !         ! apply the procedure for reversing a collision with a cell boundary
-    !         call milestone_boundary_collision() 
-    !         call close_files()
-    !         call exit()
-    !     endif
-
-    !     ! if the simulation hasn't reached a bonudary
-    !     ! save the state of the simulation and continue 
-    !     call save()
-
-    ! end if
-
-    ! property calculations
-    if (mod(n_events, propfreq) == 0) then 
-        call calculate_poperties ()
-    end if 
-
-    ! report and reset properties to user information
-    if ((mod(n_events, event_average) == 0) .and. (n_events /= 0)) then 
-        call report_properties ()
-        call save()
-    end if 
+        ! TODO :: move event averaging until very end of simulation
+        ! average properties, report to user 
+        if (mod(n_events, event_average) == 0) then 
+            call report_properties ()
+            call save()
+        end if 
+    endif
 
     ! take snap shot for movie generation as spheres
     if (((moviesph == 1) .or. (moviesqu == 1)) .and. (real(movno) < (timenow / squmovfreq))) then 
@@ -472,22 +504,48 @@ function single_step () result (stop)
         movno = movno + 1
     end if
 
-    ! TODO convert end of simulation calculation to mod function
+    ! add call to user report if event average has been reached
+
+    ! if the simulation has not yet reach equilibrium
+    if (.not. equilibrium_status) then
+        ! determine the if the criteria for equilibriation have been met
+        ! check simulation time
+        if (check_equilibriation_time .and. (timenow > equilibriation_time)) then
+            1 format(" Simulation has reached equilibrium after ", F8.2, " simulation seocnds.")
+            write (simiounit, 1) timenow
+            equilibrium_status = .true.
+        endif
+        ! check simulation events
+        if (check_equilibriation_events .and. (n_events > equilibriation_events)) then
+            2 format(" Simulation has reached equilibrium after ", F5.1, " million collision events.")
+            write (simiounit, 2) real(n_events)/1e6
+            equilibrium_status = .true.
+        endif
+        ! if the equilibriation status has turned on during this subroutine call
+        if (equilibrium_status) then
+            ! turn on property calculations 
+            ! (option to add addition criteria for property calculations)
+            calculate_properties_status = .true.
+        endif
+    endif 
+
+    ! check if simulation end criteria has been met
+    ! TODO :: add time check, specify equilibrium events (different from equilibriation period)
     if (mod(n_events,total_events) == 0) then
         call close_files() 
         if (annealing_status) then 
             ! if the annealing status is turned on
             ! increment the annealing integer, which tracks how many times
-            ! the system temperature as been decrimented    
+            ! the system temperature as been decrimented
             anneal = anneal + 1 
             ! decriment the sytstem temperature 
             call adjust_temperature (tempset) 
         endif
         call update_positions()
-        ! TODO: if the milestone has not been reached, add time to the current index
         call save () ! save the final state of the simulation 
-        call exit (CHECKPOINT_EXITCODE) ! if a boundary has not been reach, repeat the simulation
-    end if 
+        ! call exit (CHECKPOINT_EXITCODE) ! if a boundary has not been reach, repeat the simulation
+        stop = .true.
+    end if
 end function single_step
 
 ! SIMULATION SETTINGS FUNCTIONS
@@ -566,15 +624,11 @@ subroutine initialize_simulation_settings (af, ac, e, nc)
     na = cube * xa ! number of a chirality cubes 
     area = (excluded_area * cube) / eta ! area of simulation box
     region = sqrt (area) ! length of simulation box wall
-    density = real(cube) / area ! number density of cubes
+    density = real(cube) * real(mer) / area ! number density of spheres
 
     ! parameters for running simulation
-    event_equilibrium = 0.1 * total_events
-    event_equilibriate = 0.9 * total_events 
-    event_reschedule = 10000 
-    event_average = 1000000
-    propfreq = 1000000 
-    milestonecheck_freq = 1000 
+    ! TODO :: set_property frequency
+    event_average = 10000000
 
     ! turn on cell + neighbor list
     call initialize_cell_neighbor_list()
@@ -588,6 +642,167 @@ subroutine initialize_cell_neighbor_list()
     nCells = floor (region / nbrRadius) ! number of cells in one dimension, cell length cannot be shorter than the nerighbor radius
     lengthCell = region / real (nCells) ! legnth of each cell in one dimension, must be greater than the square well length (sig2)
 end subroutine initialize_cell_neighbor_list
+
+! method for determining the equilibriation time period
+! and if properties should be calculated during that time period
+subroutine set_equilibriation (equil_status, equil_time, equil_events, prop_calc_status)
+    implicit none
+    logical, intent(in), optional :: equil_status
+    ! boolean determining if the simulation should be assigned an equilibriation period
+    real, intent(in), optional :: equil_time
+    ! simulation time before system is considered at equilibrium
+    integer, intent(in), optional :: equil_events
+    ! number of collision events before simulation is considered at equilibrium
+    logical, intent(in), optional :: prop_calc_status
+    ! boolean that determines if properties should be calculated
+    ! during the equilibriation period
+
+    ! formatted write statements
+    1 format(" set_equilibriation :: Negative time passed to method (", F9.2,"). Unable to assigned equilibriation time.")
+    2 format(" set_equilibriation :: Negative events passed to method (", I13,"). Unable to assigned equilibriation events.")
+    3 format(" set_equilibriation :: Unable to turn on equilibriation period. Must specify equilibriation period (time or events).")
+    4 format(" set_equilibriation :: Simulation equilibriation period turned off.")
+    5 format(" set_equilibriation :: Simulation equilibriation period turned on.")
+    6 format(" set_equilibriation :: Equilibriation period set to ", F9.2," simulation seconds.")
+    7 format(" set_equilibriation :: Equilibriation period set to ", F5.1," million simulation events.")
+    8 format(" set_equilibriation :: Properties will be calculated during the equilibriation period.")
+    9 format(" set_equilibriation :: Properties will not be calculated during the equilibriation period.")
+
+    ! check if an equilibriuation status was passed to the method
+    if (present(equil_status)) then 
+        ! assign the equilbriation status
+        equilibriation_status = equil_status
+        equilibrium_status = .not. equil_status
+    else
+        ! assign the default
+        equilibriation_status = default_equilibriation_status
+        equilibrium_status = .not. equilibriation_status
+    endif
+
+    ! if the simulation has been assigned an equilibriation period
+    if (equilibriation_status) then
+        ! check if a length of time of number of events were passed to the method
+        if (present(equil_time)) then 
+            ! check that the length of time meets the requirements
+            if (equil_time > 0.) then 
+                ! if the length of time passed to the method is greater than zero
+                ! turn on check for equilibriation time
+                check_equilibriation_time = .true.
+                ! assign the equilibriation period in simulation seconds
+                equilibriation_time = equil_time
+            else
+                ! the value passed to the method is invalid
+                write (*,1) equil_time
+            endif
+        endif
+
+        if (present(equil_events)) then
+            ! check that the number of events meet the requirements
+            if (equil_events > 0) then
+                ! if the number of events passed to the method is greater than zero
+                ! turn on the check for equilibriation events
+                check_equilibriation_events = .true.
+                ! assign the equilibriation period in simulation collision events
+                equilibriation_events = equil_events
+            else
+                ! the value passed to the method is invalid
+                write (*,2) equil_events
+            endif
+        endif
+
+        if ((.not. check_equilibriation_time) .and. (.not. check_equilibriation_events)) then
+            ! neither a number of events or a length of time have been specified
+            ! then eqilibriation period has nothing to check for
+            ! turn off the equilibriation period
+            equilibriation_status = .false.
+            equilibrium_status = .true.
+            write (*,3)
+            write (*,4)
+        else
+            ! inform the user that the method has been turned on,
+            ! and the simulation properties that will be checked for
+            write (*,5)
+            ! inform the user of the assigned time
+            if (check_equilibriation_time) then
+                write (*,6) equilibriation_time
+            endif
+            ! inform the user of the assigned number of events
+            if (check_equilibriation_events) then
+                write (*,7) real(equilibriation_events)/1e6
+            endif
+        end if
+
+        ! if the equilibriation status is still on
+        if (equilibriation_status) then 
+            ! check if the property calculation status was passed to the method
+            if (present(prop_calc_status)) then 
+                ! assign the property calculation status
+                calculate_properties_status = prop_calc_status
+            endif 
+            ! report to user
+            if (calculate_properties_status) then
+                ! inform the user that properties will be calculated
+                write (*,8)
+            else
+                ! inform the user that properties will not be calculated
+                write (*,9)
+            endif
+        endif
+    endif
+end subroutine set_equilibriation
+
+! method for assigning the property calculation frequency,
+! and for determining the properties that are calculated during the simulation
+subroutine set_property_calculations (propfreq, eventavg)
+    implicit none
+    integer, intent(in), optional :: propfreq
+    ! number of events between property calculations
+    integer, intent(in), optional :: eventavg
+    ! number of events property calculations are averaged and reported, then reset
+
+    ! formatted write statements
+    1 format(" set_property_calculations :: Property calculation frequency set to ", F5.1, " million simulation events.")
+    2 format(" set_property_calculations :: Negative property calculation frequency passed to method ", I13,". Assigning default.")
+    3 format(" set_property_calculations :: Event average value passed to method (", I13,") is less than ",&
+        "property calculation frequency. Assigning default.")
+    4 format(" set_property_calculations :: Event average set to ", F5.1, " million simulation events.")
+
+    ! if the property calculation frequency was passed to the method
+    if (present(propfreq)) then 
+        if (propfreq > 0) then
+            ! if the value passed to the method meets the criteria, assign
+            property_calculation_frequency = propfreq
+        else
+            ! otherwise, assign the default
+            write (*,2) propfreq
+            property_calculation_frequency = default_property_calculation_frequency
+        endif
+    else
+        ! assign the default
+        property_calculation_frequency = default_property_calculation_frequency
+    endif
+
+    if (present(eventavg)) then 
+        if (eventavg > property_calculation_frequency) then
+            ! assign the event average
+            event_average = eventavg
+        else
+            ! the event average passed to the method did not meet the specifications
+            ! inform the user and assign the default
+            write (*,3) eventavg
+            event_average = property_calculation_frequency * 10
+        endif
+    else
+        ! if the event average was not specified, assign the default
+        event_average = property_calculation_frequency * 10
+    endif
+
+    ! inform the user
+    write (*,1) real(property_calculation_frequency)/1e6
+    write (*,4) real(event_average)/1e6
+
+    ! TODO :: add routines for turning certain property calculations on or off
+end subroutine set_property_calculations
 
 function set_areafraction(val) result (success)
     implicit none
@@ -1124,6 +1339,99 @@ subroutine set_external_field_rotation (rot_status, rot_freq)
         endif
     endif
 end subroutine set_external_field_rotation
+
+subroutine alignment_distribution(status, n_bins, filename, equilibrium)
+    implicit none
+    logical, intent(in), optional :: status 
+    ! status of calculating alignment distribution
+    integer, intent(in), optional :: n_bins
+    ! number of bins in distribution histogram
+    character(len=*), intent(in), optional :: filename 
+    ! name of file to save normalized distribution too
+    logical, intent(in), optional :: equilibrium
+    ! boolean to wait for system to reach equilibrium 
+    ! before starting compiling distribution
+
+    !! FORMATTED WRITE STATEMENTS
+    1 format(" alignment_distribution :: alignment distribution file name set to ", A,".")
+
+    ! assign distribution parameters based on function inputs
+    ! check status
+    if (present(status)) then 
+        if (status) then 
+            ! turn on alignment distribution
+            calc_align_dist = .true.
+            write (*,*) "alignment_distribution :: calculate alignment distribution turned on."
+        else
+            ! turn off alignment distribution
+            calc_align_dist = .false.
+            write (*,*) "alignment_distribution :: calculate alignment distribution turned off."
+        endif 
+    else
+        ! if the distribution status is not passed to the method, 
+        ! the alignment distribution is off
+        calc_align_dist = .false.
+    endif
+
+    if (calc_align_dist) then
+        ! if the alignment distribution is on, check the other properties
+
+        ! check number of bins in distribution histogram
+        if (present(n_bins)) then
+            ! check if the value passed to the method meets the constrains
+            if (n_bins > max_n_align_bin) then
+                ! if the number of bins passed to the method
+                ! is greater than the allowable amount
+                ! assign the maximum allowable number
+                n_align_bin = max_n_align_bin
+            else if (n_bins < min_n_align_bin) then
+                ! if the number of bins passed to the method
+                ! is less than the allowable amount
+                ! assign the minimum number
+                n_align_bin = min_n_align_bin
+            else
+                ! the number is with in the appropriate range
+                n_align_bin = n_bins
+            endif
+        else
+            ! assign the default number
+            n_align_bin = default_align_bin
+        endif
+
+        ! check the filename
+        if (present(filename)) then 
+            ! assign the filename passed to the method alignment file
+            ! TODO :: check that the file has the correct filetype ending
+            ! check the length, assign
+            if (len_trim(filename) <= max_charlength) then 
+                ! if the length is less than the max character length
+                ! assign the job
+                align_dist_filename = trim(filename)
+            else
+                ! if the string is too long 
+                ! inform the user and assign the default
+                write (*,*) "alignment_distribution :: unable to assign filename passed to method. Too many characters in string."
+                align_dist_filename = trim(default_align_dist_file)
+            endif
+        else
+            ! assign the default file name
+            align_dist_filename = trim(default_align_dist_file)
+        endif
+        write (*,1) trim(align_dist_filename)
+
+        ! check the equilibrium conditions
+        if (present(equilibrium)) then 
+            ! assign the equilibrium value
+            align_dist_equil_status = equilibrium
+        else
+            ! assign the default equilibrium status
+            align_dist_equil_status = default_align_dist_equil_status
+        endif
+
+        ! allocate and initialize array!! 
+        allocate(alignment_histogram(n_align_bin))
+    endif
+end subroutine alignment_distribution
 
 ! ** type(id) functions **************************************
 
@@ -2489,6 +2797,13 @@ subroutine close_files ()
     write(mmiounit, *) boundary_index, ',', upper_nematic_boundary, ',', lower_nematic_boundary, ',', &
         n_ul, ',', n_uu, ',', n_lu, ',', n_ll, ',', t_u, ',', t_l 
     close (unit = mmiounit, status = 'KEEP')
+
+    ! write equilbrium distributions to file
+    if (calc_align_dist) then
+        call accumulate_alignment_distribution (1, align_dist_filename, align_dist_iounuit)
+        ! deallocate arrays
+        deallocate(alignment_histogram)
+    endif
 end subroutine close_files
 
 subroutine record_position_circles ()
@@ -2564,12 +2879,12 @@ subroutine record_position_squares ()
     character(len=15), parameter :: A = green
     character(len=15), parameter :: B = orange
     integer :: i, m, q ! indexing parameters
-    character(len=20) :: num, format, string, charge, typenum, typecol, qxy, qzw
+    character(len=20) :: num, format, string, charge, typenum, typecol, qxy, qzw, mag
 
     format = "(2(' ', F7.3))"
 
     write(coorsquiounit,*) cube
-    write(coorsquiounit,*) ' position (xy), orientation (xyzw), particle type, chiralcolor (RBG) ' ! comment line frame number starting from 1
+    write(coorsquiounit,*) ' position (xy), orientation (xyzw), particle type, chiralcolor (RBG), mag ' ! comment line frame number starting from 1
     do i = 1, cube
         ! calculate the real position of all circles
         do m = 1, mer
@@ -2648,12 +2963,33 @@ subroutine record_position_squares ()
         ! calculate the center of the square particle based on the position of the first particle
         rsquare%r(1) = rcircles(1)%r(1) + (sqrt(2.) / 2.) * cos((5. * pi / 4.) + phi)
         rsquare%r(2) = rcircles(1)%r(2) + (sqrt(2.) / 2.) * sin((5. * pi / 4.) + phi)
+
+        ! calculate the alignment of the particle with the field
+        phi = 0.
+        do q = 1, ndim 
+            ! the orientation of the square depends on the squares chirality
+            if (square(i)%chai == 1) then
+                ! if the chirality of the square is A
+                dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+            else
+                ! if the chirality of the square is B
+                dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+            endif
+            if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
+            if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
+            phi = phi + (dr%r(q) ** 2)
+        enddo
+        phi = sqrt(phi) ! distance vector
+        phi = (dr%r(2)) / phi ! normalized y-distance
+        !! NOTE :: assumes field direction
+        
         ! apply preiodic boundary conditions
         call apply_periodic_boundaries (rsquare)
         write(string, format) rsquare%r(1), rsquare%r(2)
+        write(mag, '(" ", F7.3)') phi
 
         ! report the description
-        write(coorsquiounit, *) trim(num), trim(string), trim(qxy), trim(qzw), trim(typenum), trim(typecol)
+        write(coorsquiounit, *) trim(num), trim(string), trim(qxy), trim(qzw), trim(typenum), trim(typecol), trim(mag)
     end do 
 end subroutine record_position_squares
 
@@ -2713,7 +3049,7 @@ subroutine report_properties()
         ',',allign%sum,',',allign%sum2 ! magnetization OP 
 
     ! if the system has equilibraited, accumulate equilibrium sums
-	if (n_events > event_equilibriate) then 
+	if (equilibrium_status) then 
 		do q = 1, ndim
             call accumulate_properties (lm(q), 4)
 		end do 
@@ -2796,6 +3132,11 @@ subroutine initialize_properties ()
     call accumulate_properties (nclust, 0)
     call accumulate_properties (nematic, 0)
     call accumulate_properties (allign, 0)
+
+    ! intialize histogram arrays
+    if (calc_align_dist) then 
+        alignment_histogram = 0
+    endif
 end subroutine initialize_properties
 
 subroutine calculate_poperties()
@@ -2866,6 +3207,12 @@ subroutine calculate_poperties()
     ! ** allignment **********************************************
     call calculate_allignment (allign%value)
     call accumulate_properties (allign, 2)
+
+    ! calculate distributions
+    ! accumulate alignment distribution
+    if (calc_align_dist) then
+        call accumulate_alignment_distribution (0)
+    endif
 end subroutine calculate_poperties
 
 subroutine accumulate_potential (potential)
@@ -3527,6 +3874,97 @@ subroutine calculate_allignment(op)
     ! average and return
     op = op / real(cube)
 end subroutine calculate_allignment
+
+! // alignment distribution //
+
+subroutine accumulate_alignment_distribution(icode, iofile, iounit)
+    implicit none
+    integer, intent(in) :: icode ! defines operation to be performed
+    character(len=max_charlength), intent(in), optional :: iofile
+    integer, intent(in), optional :: iounit
+    real(kind=dbl) :: dist_delta ! width of histogram bins
+    character(len=40) :: distfile 
+    integer :: i, m, q ! indexing
+    real(kind=dbl) :: phi ! orientation of rod relative to the y-axis (assumed direction of field)
+    type(position), dimension(mer) :: rcircles ! position of all disks making the colloid
+    type(position) :: dr ! used as intermediary for angle calculation
+    real(kind=dbl) :: totalarea ! used to count the total number of histogram counts
+
+    ! establish the distribution delta factor
+    dist_delta = (max_align_bin - min_align_bin) / n_align_bin
+
+    ! check operation to be performed
+    if (icode == 0) then 
+        ! accumulate the distribution of allignment with the field
+        ! for each rod
+        do i = 1, cube 
+            ! calculate the allignment of the rod with the field
+            ! initialize the angle of the rod
+            phi = 0.
+            ! calculate the real position of all of the circles from the false position
+            do m = 1, mer 
+                do q = 1, ndim 
+                    rcircles(m)%r(q) = square(i)%circle(m)%fpos%r(q) + square(i)%circle(m)%vel%v(q) * tsl 
+                enddo
+                call apply_periodic_boundaries (rcircles(m))
+            enddo
+
+            ! calculate the angle of the colloid relative to the x-axis
+            phi = 0.
+            do q = 1, ndim 
+                ! the orientation of the square depends on the squares chirality
+                if (square(i)%chai == 1) then
+                    ! if the chirality of the square is A
+                    dr%r(q) = rcircles(1)%r(q) - rcircles(2)%r(q)
+                else
+                    ! if the chirality of the square is B
+                    dr%r(q) = rcircles(2)%r(q) - rcircles(1)%r(q)
+                endif
+                if (dr%r(q) >= 0.5*region) dr%r(q) = dr%r(q) - region 
+                if (dr%r(q) < -0.5*region) dr%r(q) = dr%r(q) + region
+                phi = phi + (dr%r(q) ** 2)
+            enddo
+            phi = sqrt(phi) ! distance vector
+            phi = (dr%r(2)) / phi ! normalized y-distance
+            phi = acos(phi) ! bounds [-1, 1], range [0, pi] 
+            if (dr%r(1) > 0.) phi = -phi
+            if (phi < -pi) then
+                phi = phi + twopi
+            elseif (phi > pi) then 
+                phi = phi - twopi
+            endif
+            ! accumulate the alignment in the histogram
+            m = ceiling((phi - min_align_bin) / dist_delta)
+            alignment_histogram(m) = alignment_histogram(m) + 1
+        end do
+    elseif (icode == 1 .and. present(iounit) .and. present(iofile)) then 
+        ! write the histogram out to file
+        ! establish the filename
+        distfile = trim(jobid) // trim(simid) // '_' // trim(iofile)
+        ! open the file to write the information to
+        open (unit = iounit, file = distfile, status = 'REPLACE')
+        ! write header
+        write(iounit,*) 'no,theta,align'
+        ! sum the total number of counts in the histogram
+        totalarea = 0.
+        do i = 1, n_align_bin
+            ! area is hight times width?
+            ! TODO :: should area be calculated in radians times arc length? 
+            ! TODO :: that turns into more of an optimization problem since the radius would be variable
+            !       with respect to the angle
+            totalarea = totalarea + alignment_histogram(i) * dist_delta
+        enddo
+        ! write the normalize histogram count to the file
+        do i = 1, n_align_bin
+            ! histogram(i) = histogram(i) * (normal_frac / (real(i - 0.5) ** 2))
+            write (iounit,501) i, (((real(i) - 0.5) * dist_delta) + min_align_bin), &
+                real(alignment_histogram(i)) / totalarea
+            501 format(I3,',',F8.5,',',F8.5)
+        end do
+        ! close the file
+        close(unit = iounit, status = 'KEEP')
+    endif
+end subroutine accumulate_alignment_distribution
 
 ! ** event scheduling *****************************************
 

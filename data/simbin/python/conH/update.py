@@ -11,11 +11,9 @@ import pandas as pd
 import numpy as np
 import glob
 import matplotlib.pyplot as plt
-import conH_simparam as parm
+# from simparam import conH_simparm as parm
 
 ## PARAMETERS
-# execute script verbosely
-verbose = True
 # integer the specifies the number of points contained in a data series plot
 max_ds_points = 10000
 
@@ -82,9 +80,9 @@ def plot_temp_time_series (save_path, time, temp):
 	plt.savefig(save_path, bbox_inches='tight', dpi = 200)
 	plt.close(fig)
 
-# method used to compile results from the simulation, report the current
-# state of the simulation to the user
-def update_simulation_results(sim_parm):
+# method used to compile results from the annealing simulation, 
+# then report the current state of the simulation to the user
+def compile_simulation_results (sim_parm):
 
 	# # parse the simid from the splice file
 	# simid = glob.glob(sim_dir + "*.spl")
@@ -193,85 +191,41 @@ def update_simulation_results(sim_parm):
 	## TODO :: return most recent point in data series for sim update file
 	return prop_dict
 
+# method that gets updates from simulations, described by
+# list of simulation parameters passed to method
+def update_simulation_results (simparms, savedir = None, saveas = None, verbose = False):
 
-## ARGUMENTS
-# id associated with job
-job = sys.argv[1]
-# id associated with simulation parameters
-sim = sys.argv[2]
-# optional path to csv file containing simulation parameters
-simparm_path = sys.argv[3]
+	df_results = pd.DataFrame() # establish empty data frame that contains the results
+	i = 0 # used to count the number of rows in the data frame
 
+	# loop through parameters, load results
+	for p in simparms:
+		# inform user
+		if verbose:
+			print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
 
-## SCRIPT
-## create data frame which stores results for the simulation
+		# compile the current results of the simulation, return sim infor
+		prop_dict = compile_simulation_results (p)
 
-job_parms = parm.load_conH_parms(simparm_path) # load simulation parameters from file
-df_results = pd.DataFrame() # establish empty data frame that contains the results
-i = 0 # used to count the number of rows in the data frame
+		# create dictionary containing simulation parameters, add to dataframe
+		sim_dict = p.info() | prop_dict
+		df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
 
-# loop through parameters, load results
-for p in job_parms:
-	# inform user
-	if verbose:
-		print("Summarizing directory no. {:d} ({:s})".format(i, p.path))
+		# increment the number of rows in the data frame
+		i += 1
 
-	# compile the current results of the simulation, return sim infor
-	prop_dict = update_simulation_results(p)
+	# if save dir was specified
+	if savedir is not None:
+		# print the results as a csv
+		# create summary directories
+		if not os.path.exists(savedir):
+			os.mkdir(savedir)
 
-	# create dictionary containing simulation parameters, add to dataframe
-	# sim_dict = {'jobid': jobid, 'simid': simid, 'achai': achai_val, \
-	# 	'field': field_val, 'density': density_val}
-	sim_dict = p.info() | prop_dict
-	df_results = pd.concat([df_results, pd.DataFrame(sim_dict, index = [i])])
+		# establish save file
+		if saveas is not None:
+			savefile = savedir + saveas
+		else:
+			savefile = savedir + 'status.csv'
 
-	# increment the number of rows in the data frame
-	i += 1
-
-# using the simulation directories, create phase diagrams for the following conditions
-
-
-# print the results as a csv
-# create summary directories file
-if not os.path.exists(f"{job}/{sim}/summary/"):
-	os.mkdir(f"{job}/{sim}/summary/")
-# write the sim status file to the summary directory
-df_results.to_csv(f"{job}/{sim}/summary/status.csv", index = False)
-
-
-
-
-# ##  determine the simulation parameters based on the directory hirearchy
-# # variable that contains the current operating directory
-# curr_dir = anal_dir
-
-# # the first directory is the number fraction of achirality particles
-# # determine the simulation parameters according to the directory hirerarchy
-# achai_params = get_dir_params(curr_dir, "a")
-
-# # loop through each achirality directory, determine next set of parameters
-# for achai_val in achai_params:
-
-# 	# get the directory corresponding to the achiraliry parameter value
-# 	achai_dir = "a{:03d}/".format(int(achai_val * 100))
-# 	curr_dir = anal_dir + achai_dir
-
-# 	# the second directory in the hirearchy is the set point of 
-# 	# the external field strength
-# 	field_params = get_dir_params(curr_dir, "h")
-
-# 	# loop through each directory external field strength parameters
-# 	for field_val in field_params:
-
-# 		# get the directory corresponding to the external field parameter value
-# 		field_dir = "h{:02d}/".format(int(field_val * 100))
-# 		curr_dir = anal_dir + achai_dir + field_dir
-
-# 		# the third directory in the hirearchy is the simulation density
-# 		density_params = get_dir_params(curr_dir, "e")
-
-# 		# loop through each density directory
-# 		for density_val in density_params:
-
-# 			# get the directory corresponding to the simulation density
-# 			density_dir = "e{:02d}/".format(int(density_val * 100))
+		# write the sim status file to the summary directory
+		df_results.to_csv(savefile, index = False)

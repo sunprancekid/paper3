@@ -29,13 +29,13 @@ MODEL="squ2"
 # default cell size of simulation
 declare -i CELL=32
 # default simulation area fraction
-declare -i AREA_FRACTION=4
+declare -i AREA_FRACTION=3
 # default area fraction of simulation
 declare -i ETA=20
 # default number of simulation events
 declare -i EVENTS=300000000
 # minimum temperature set point for simulations
-declare -i TEMP_MIN=025
+declare -i TEMP_MIN=020
 # maximum temperature set point
 declare -i TEMP_MAX=150
 # amount to INCREMENT the temperature set point by
@@ -129,7 +129,7 @@ gendirs () {
 	## SCRIPT
 
 	# inform user
-	if [[ VERB_BOOL -eq 1 ]] ; then
+	if [[ $VERB_BOOL -eq 1 ]] ; then
 		echo "generating directories in ${D}"
 	fi
 
@@ -137,6 +137,7 @@ gendirs () {
 	./simbin/bash/gendir.sh -d ${D} -s /out -v -o # contains output files from CHTC execute node
 	./simbin/bash/gendir.sh -d ${D} -s /txt -v -o # contains text files from simulation
 	./simbin/bash/gendir.sh -d ${D} -s /anneal -v -o # contains anneal files from simulation
+	./simbin/bash/gendir.sh -d ${D} -s /dist -v -o # contains angular distributions from simulation
 	./simbin/bash/gendir.sh -d ${D} -s /fortran -v -o # contains fortran files for simulations
 }
 
@@ -202,9 +203,9 @@ genCHTCsub () {
 	# list of files that are transfered to the execute node
 	local transin="fortran/polsqu2x2_mod.f90, fortran/testH_${testH_job}.f90"
 	# list of files that are transfered from the execute node
-	local transout="${simname}.txt, ${simname}_anneal.csv"
+	local transout="${simname}.txt, ${simname}_anneal.csv, ${simname}_aligndist.csv"
 	# list of remap instructions for files transfered from execute node
-	local transoutremap="${simname}.txt=txt/\$(simid).txt; ${simname}_anneal.csv=anneal/\$(simid)_anneal.csv"
+	local transoutremap="${simname}.txt=txt/\$(simid).txt; ${simname}_anneal.csv=anneal/\$(simid)_anneal.csv; ${simname}_aligndist.csv=dist/\$(simid)_aligndist.csv"
 	# name of the CHTC submission file
 	# local sub="${D}/${JOB}.sub"
 
@@ -279,9 +280,9 @@ gensimparam () {
 	flags="${flags} -c ${CELL} -e ${EVENTS} -a ${AREA_FRACTION}"
 	# testH parameters
 	if [[ "$testH_job" == "TX" ]]; then
-		flags="${flags} -x 500 -i 5 -r ${REPLICATE}"
+		flags="${flags} -x 1000 -i 5 -r ${REPLICATE}"
 	elif [[ "$testH_job" == "TH" ]]; then
-		flags="${flags} -h 800 -i 5 -r ${REPLICATE}"
+		flags="${flags} -h 1200 -i 5 -r ${REPLICATE}"
 	fi
 
 	# loop through each temperature

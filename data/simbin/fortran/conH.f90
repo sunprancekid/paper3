@@ -46,6 +46,13 @@ program conH
 
     ! initialize the simulation
     call initialize_simulation_settings(af = area_frac, e = events, nc = cell_size, ac = a_chai_frac)
+    ! turn off property calculations during simulation equilibriation period
+    call set_equilibriation (equil_status = .true., equil_events = (events - int(20e6)), prop_calc_status = .false.)
+    ! assign property calculation frequency
+    call set_property_calculations (propfreq = 100000, eventavg = 10000000)
+
+    ! turn on calculation of the alignment distribution
+    call alignment_distribution (status = .true., n_bins = 100)
 
     ! initialize system
     call initialize_system(job = trim(args(2)), sim = trim(args(3)))
@@ -54,7 +61,7 @@ program conH
     ! set simulation parameters
     call set_sphere_movie (status = .false.)
     call set_square_movie (status = .true., freq = 1000.)
-    call set_thermostat (status = .true., freq = 0.1)
+    call set_thermostat (status = .true., freq = 0.05)
     call set_external_field (status = .true., strength = field_strength)
 
     ! save the status of the simulation after initialization
